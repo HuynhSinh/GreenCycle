@@ -1,0 +1,354 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "windows"]
+}
+
+datasource db {
+  provider = "postgresql"
+  //url      = env("DATABASE_URL")
+}
+
+// ================= ENUMS (Sử dụng cho các trạng thái cố định) =================
+
+enum UserRole {
+  CUSTOMER
+  DRIVER
+  ADMIN
+  PARTNER_STAFF
+}
+
+enum PickupStatus {
+  PENDING           // Chờ Admin duyệt
+  VERIFYING         // Đang xác minh thông tin
+  APPROVED          // Đã duyệt, chờ gom cụm (cluster)
+  ASSIGNED          // Đã gán cho tài xế & lộ trình
+  COLLECTING        // Tài xế đang trên đường đến
+  ARRIVED           // Tài xế đã đến vị trí
+  COLLECTED         // Đã lấy hàng thành công
+  IN_TRANSIT        // Đang vận chuyển về kho/đối tác
+  AT_WAREHOUSE      // Đã nhập kho phân loại
+  COMPLETED         // Đã bàn giao đối tác tái chế & hoàn tất tích điểm
+  CANCELLED         // Khách hủy
+  REJECTED          // Admin từ chối đơn
+  FAILED            // Thu gom thất bại (không liên lạc được, rác sai mô tả)
+  RESCHEDULED       // Khách/Driver hẹn lại lịch
+}
+
+enum TransactionType {
+  EARN_RECYCLING
+  REDEEM_REWARD
+  ADMIN_ADJUST
+}
+
+enum RewardType {
+  DIGITAL_VOUCHER
+  PHYSICAL_PRODUCT
+}
+
+// ================= USER & PROFILE =================
+
+model Account {
+  idAccount    String   @id @default(uuid())
+  username     String   @unique
+  password     String
+  email        String   @unique
+  role         UserRole @default(CUSTOMER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  customer     Customer?
+  driver       Driver?
+  partner      RecyclingPartner?
+  notifications Notification[]
+  auditLogs    AuditLog[]
+}
+
+model Customer {
+  idCustomer    String   @id @default(uuid())
+  fullName      String
+  phoneNumber   String   @unique
+  isEnterprise  Boolean  @default(false)
+  
+  idAccount     String   @unique
+  account       Account  @relation(fields: [idAccount], references: [idAccount])
+
+  enterprise    Enterprise?
+  addresses     Address[]
+  pickupRequests PickupRequest[]
+  rewardExchanges RewardExchange[]
+  wallet        EcoWallet?
+  greenPassport GreenPassport?
+}
+
+model Enterprise {
+  idEnterprise  String   @id @default(uuid())
+  idCustomer    String   @unique
+  companyName   String
+  taxCode       String   @unique
+  industry      String?
+  contactPerson String?
+  
+  customer      Customer @relation(fields: [idCustomer], references: [idCustomer])
+}
+
+model Driver {
+  idDriver      String   @id @default(uuid())
+  fullName      String
+  phoneNumber   String   @unique
+  vehicleInfo   String?
+  licensePlate  String?
+  isActive      Boolean  @default(true)
+  currentLat    Float?
+  currentLng    Float?
+  
+  idAccount     String   @unique
+  account       Account  @relation(fields: [idAccount], references: [idAccount])
+
+  assignments   PickupAssignment[]
+  clusters      CollectionCluster[]
+}
+
+model RecyclingPartner {
+  idPartner     String   @id @default(uuid())
+  name          String
+  licenseNumber String   @unique
+  address       String
+  contactPhone  String
+  status        Boolean  @default(true)
+
+  idAccount     String   @unique
+  account       Account  @relation(fields: [idAccount], references: [idAccount])
+  
+  pickupsReceived PickupRequest[]
+}
+
+// ================= LOGISTICS & ADDRESSES =================
+
+model Address {
+  idAddress     String   @id @default(uuid())
+  idCustomer    String
+  label         String   // Ví dụ: Nhà riêng, Công ty, Ký túc xá
+  addressLine   String
+  ward          String?
+  district      String
+  city          String   @default("Ho Chi Minh")
+  latitude      Float
+  longitude     Float
+  isDefault     Boolean  @default(false)
+
+  customer      Customer @relation(fields: [idCustomer], references: [idCustomer])
+  pickupRequests PickupRequest[]
+}
+
+model CollectionCluster {
+  idCluster     String   @id @default(uuid())
+  idDriver      String
+  scheduledDate DateTime
+  district      String
+  status        String   // OPEN, IN_PROGRESS, CLOSED
+  
+  driver        Driver   @relation(fields: [idDriver], references: [idDriver])
+  assignments   PickupAssignment[]
+}
+
+model PickupRequest {
+  idRequest     String          @id @default(uuid())
+  idCustomer    String
+  idAddress     String
+  idPartner     String?         // Sau khi bàn giao cho đối tác tái chế nào
+  status        PickupStatus    @default(PENDING)
+  scheduledTime DateTime
+  totalPoints   Int             @default(0)
+  totalWeight   Float           @default(0)
+  note          String?
+  createdAt     DateTime        @default(now())
+
+  customer      Customer        @relation(fields: [idCustomer], references: [idCustomer])
+  address       Address         @relation(fields: [idAddress], references: [idAddress])
+  partner       RecyclingPartner? @relation(fields: [idPartner], references: [idPartner])
+  
+  wasteItems    WasteItem[]
+  assignment    PickupAssignment?
+  timeline      PickupTimeline[]
+}
+
+model PickupAssignment {
+  idAssignment  String   @id @default(uuid())
+  idRequest     String   @unique
+  idDriver      String
+  idCluster     String?
+  routeOrder    Int?     // Thứ tự trong lộ trình tối ưu
+  assignedAt    DateTime @default(now())
+
+  request       PickupRequest      @relation(fields: [idRequest], references: [idRequest])
+  driver        Driver             @relation(fields: [idDriver], references: [idDriver])
+  cluster       CollectionCluster? @relation(fields: [idCluster], references: [idCluster])
+}
+
+model PickupTimeline {
+  idTimeline    String       @id @default(uuid())
+  idRequest     String
+  status        PickupStatus
+  note          String?
+  createdAt     DateTime     @default(now())
+  createdBy     String?      // ID của người thực hiện hành động (Admin/Driver/User)
+
+  request       PickupRequest @relation(fields: [idRequest], references: [idRequest])
+}
+
+// ================= WASTE & CATEGORIES =================
+
+model WasteCategory {
+  idCategory    String   @id @default(uuid())
+  name          String   @unique
+  co2Factor     Float    // kg CO2 giảm được trên 1kg rác
+  pointFactor   Int      // Điểm thưởng trên 1kg rác
+  hazardLevel   String   @default("Low")
+  pricePerKg    Float?   // Giá trị phế liệu ước tính (phục vụ tài chính nội bộ)
+  iconUrl       String?
+
+  items         WasteItem[]
+}
+
+model WasteItem {
+  idItem        String   @id @default(uuid())
+  idRequest     String
+  idCategory    String
+  weight        Float    @default(0) // Khối lượng thực tế xác nhận khi lấy
+  pointsEarned  Int      @default(0)
+
+  request       PickupRequest @relation(fields: [idRequest], references: [idRequest])
+  category      WasteCategory @relation(fields: [idCategory], references: [idCategory])
+  images        WasteImage[]
+}
+
+model WasteImage {
+  idImage       String   @id @default(uuid())
+  idItem        String
+  url           String
+  type          String   // BEFORE_PICKUP, AFTER_PICKUP
+  createdAt     DateTime @default(now())
+
+  item          WasteItem @relation(fields: [idItem], references: [idItem])
+}
+
+// ================= REWARDS & GAMIFICATION =================
+
+model EcoWallet {
+  idWallet      String   @id @default(uuid())
+  idCustomer    String   @unique
+  balance       Int      @default(0)
+  
+  customer      Customer @relation(fields: [idCustomer], references: [idCustomer])
+  transactions  Transaction[]
+}
+
+model Transaction {
+  idTransaction String          @id @default(uuid())
+  idWallet      String
+  type          TransactionType
+  amount        Int
+  description   String?
+  createdAt     DateTime        @default(now())
+
+  wallet        EcoWallet       @relation(fields: [idWallet], references: [idWallet])
+}
+
+model GreenPassport {
+  idPassport    String   @id @default(uuid())
+  idCustomer    String   @unique
+  totalKg       Float    @default(0)
+  totalCO2      Float    @default(0)
+  totalPoints   Int      @default(0)
+  level         Int      @default(1)
+  badge         String?  // Danh hiệu: "Eco Warrior", "Earth Guardian",...
+
+  customer      Customer @relation(fields: [idCustomer], references: [idCustomer])
+}
+
+model Reward {
+  idReward      String     @id @default(uuid())
+  name          String
+  description   String?
+  type          RewardType
+  pointCost     Int
+  partnerName   String?
+  imageUrl      String?
+  
+  exchanges     RewardExchange[]
+  inventory     RewardInventory?
+}
+
+model RewardInventory {
+  idInventory   String   @id @default(uuid())
+  idReward      String   @unique
+  stockQuantity Int      @default(0) // Cho quà vật lý
+  isUnlimited   Boolean  @default(false)
+
+  reward        Reward   @relation(fields: [idReward], references: [idReward])
+  vouchers      VoucherCode[]
+}
+
+model VoucherCode {
+  idVoucher     String   @id @default(uuid())
+  idInventory   String
+  code          String   @unique
+  isUsed        Boolean  @default(false)
+  expiryDate    DateTime?
+
+  inventory     RewardInventory @relation(fields: [idInventory], references: [idInventory])
+}
+
+model RewardExchange {
+  idExchange    String   @id @default(uuid())
+  idCustomer    String
+  idReward      String
+  createdAt     DateTime @default(now())
+  status        String   // PENDING, SUCCESS, FAILED
+  voucherCodeUsed String?
+
+  customer      Customer @relation(fields: [idCustomer], references: [idCustomer])
+  reward        Reward   @relation(fields: [idReward], references: [idReward])
+}
+
+// ================= SUPPORT & AUDIT =================
+
+model Notification {
+  idNotification String   @id @default(uuid())
+  idAccount      String
+  title          String
+  body           String
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  account        Account  @relation(fields: [idAccount], references: [idAccount])
+}
+
+model ESGReport {
+  idReport       String   @id @default(uuid())
+  title          String
+  startDate      DateTime
+  endDate        DateTime
+  totalRequests  Int
+  totalWeight    Float
+  totalCO2Saved  Float
+  hazardousWaste Float
+  recycledRate   Float
+  enterpriseId   String?  // Nếu báo cáo cho riêng 1 B2B
+
+  createdAt      DateTime @default(now())
+}
+
+model AuditLog {
+  idLog          String   @id @default(uuid())
+  idAccount      String
+  action         String   // Ví dụ: DELETE_PICKUP, ADJUST_POINTS
+  targetTable    String
+  targetId       String
+  oldValue       Json?
+  newValue       Json?
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+
+  account        Account  @relation(fields: [idAccount], references: [idAccount])
+}

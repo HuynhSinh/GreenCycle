@@ -1,0 +1,21 @@
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: greencycle-server
+    ports:
+      - '5000:5000'
+      - '5555:5555'
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    # --- CHỈNH DÒNG NÀY ---
+    env_file:
+      - ./.env  # Trỏ ra file .env ở thư mục gốc
+    # ----------------------
+    environment:
+      - PORT=5000
+      - HOST=0.0.0.0
+    command: sh -c "npx prisma generate && npx prisma db push && npx prisma studio"
+    restart: always
