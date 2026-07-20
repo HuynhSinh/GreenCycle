@@ -1,19 +1,16 @@
 services:
-  db-viewer:
-    build:
-      context: .
-      dockerfile: ./server/Dockerfile
-    container_name: greencycle-db-viewer
-    ports:
-      - "5555:5555"
-    env_file:
-      - .env
-    # --- THÊM DÒNG NÀY ĐỂ PRISMA STUDIO NHẬN KẾT NỐI TỪ NGOÀI ---
+  db:
+    image: postgres:16-alpine
+    container_name: greencycle-db
+    restart: always
     environment:
-      - HOST=0.0.0.0
-    # ---------------------------------------------------------
+      POSTGRES_DB: greencycle
+      POSTGRES_USER: greencycle
+      POSTGRES_PASSWORD: greencycle123
+    ports:
+      - "5433:5432"
     volumes:
-      - .:/app
-      - /app/node_modules
-    # --- SỬA LẠI LỆNH COMMAND (XÓA --hostname) ---
-    command: sh -c "npx prisma generate && npx prisma db push && npx prisma studio --browser none --port 5555"
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

@@ -59,8 +59,24 @@ model Account {
   customer     Customer?
   driver       Driver?
   partner      RecyclingPartner?
+  refreshTokens RefreshToken[]
   notifications Notification[]
   auditLogs    AuditLog[]
+}
+
+model RefreshToken {
+  idRefreshToken String   @id @default(uuid())
+  tokenHash      String   @unique
+  idAccount      String
+  userAgent      String?
+  ipAddress      String?
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+
+  account        Account  @relation(fields: [idAccount], references: [idAccount], onDelete: Cascade)
+
+  @@index([idAccount])
+  @@index([expiresAt])
 }
 
 model Customer {

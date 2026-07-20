@@ -1,12 +1,12 @@
 FROM node:20-alpine
 
-WORKDIR /app
+WORKDIR /app/client
 
-COPY package*.json ./
+COPY client/package.json ./
 
 RUN npm install
 
-COPY . .
+COPY client ./
 
 EXPOSE 5173
 
