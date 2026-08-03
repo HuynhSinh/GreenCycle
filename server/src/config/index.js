@@ -1,4 +1,7 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+
+dotenv.config({ path: "../.env" });
+dotenv.config({ override: true });
 
 const isTest = process.env.NODE_ENV === "test";
 const isProduction = process.env.NODE_ENV === "production";
@@ -37,6 +40,13 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || "development",
   databaseUrl: process.env.DATABASE_URL,
   clientOrigin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+  clientOrigins: [
+    ...new Set([
+      ...(process.env.CLIENT_ORIGIN || "").split(",").map((origin) => origin.trim()).filter(Boolean),
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+    ]),
+  ],
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || "test-access-secret",
     refreshSecret: process.env.JWT_REFRESH_SECRET || "test-refresh-secret",

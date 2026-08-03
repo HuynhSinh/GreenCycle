@@ -6,6 +6,7 @@ import { ProtectedRoute } from '../components/ProtectedRoute';
 import AdminDashboard from '../features/dashboard/pages/AdminDashboard';
 import CustomerDashboard from '../features/dashboard/pages/CustomerDashboard';
 import DriverDashboard from '../features/dashboard/pages/DriverDashboard';
+import CollectionScheduleManagement from '../features/collection-schedules/pages/CollectionScheduleManagement';
 
 export function AppRoutes() {
   return (
@@ -19,6 +20,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute requiredRole="ADMIN">
             <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/admin/schedules"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <CollectionScheduleManagement />
           </ProtectedRoute>
         }
       />

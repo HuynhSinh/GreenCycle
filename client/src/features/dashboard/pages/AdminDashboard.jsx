@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart3, Users, TrendingUp, AlertCircle, LogOut, Menu, X } from 'lucide-react';
+import { BarChart3, Users, TrendingUp, AlertCircle, LogOut, Menu, X, CalendarDays } from 'lucide-react';
 import { logout } from '../../auth/api/auth';
 import { useNavigate } from 'react-router-dom';
 
@@ -51,6 +51,7 @@ export default function AdminDashboard() {
         <nav className="flex-1 p-4 space-y-2">
           <NavItem icon={BarChart3} label="Dashboard" sidebarOpen={sidebarOpen} active />
           <NavItem icon={Users} label="Users" sidebarOpen={sidebarOpen} />
+          <NavItem icon={CalendarDays} label="Schedules" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/schedules')} />
           <NavItem icon={TrendingUp} label="Pickups" sidebarOpen={sidebarOpen} />
           <NavItem icon={AlertCircle} label="Reports" sidebarOpen={sidebarOpen} />
         </nav>
@@ -152,9 +153,10 @@ export default function AdminDashboard() {
   );
 }
 
-function NavItem({ icon: Icon, label, sidebarOpen, active }) {
+function NavItem({ icon: Icon, label, sidebarOpen, active, onClick }) {
   return (
     <button
+      onClick={onClick}
       className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
         active ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:bg-slate-800'
       }`}

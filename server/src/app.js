@@ -14,7 +14,7 @@ const app = express();
 app.use(helmet());
 app.use(
   cors({
-    origin: config.clientOrigin,
+    origin: config.clientOrigins,
     credentials: true,
   }),
 );

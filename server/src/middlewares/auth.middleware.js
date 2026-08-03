@@ -19,3 +19,11 @@ export const requireAuth = (req, res, next) => {
     next(new AppError("Unauthorized", 401));
   }
 };
+
+export const requireRole = (...allowedRoles) => (req, res, next) => {
+  if (!req.user || !allowedRoles.includes(req.user.role)) {
+    return next(new AppError("Forbidden", 403));
+  }
+
+  next();
+};

@@ -17,7 +17,7 @@ COPY server/ .
 RUN npx prisma generate
 
 # Port server và Prisma Studio
-EXPOSE 3011
+EXPOSE 3000
 EXPOSE 5555
 
 # Chạy server
