@@ -22,7 +22,7 @@ export async function apiRequest(path, options = {}) {
   const data = contentType.includes('application/json') ? await response.json() : null;
 
   if (!response.ok) {
-    throw new ApiError(data?.message || 'Request failed', response.status);
+    throw new ApiError(data?.message || data?.error || 'Request failed', response.status);
   }
 
   return data;

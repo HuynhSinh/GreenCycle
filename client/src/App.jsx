@@ -1,12 +1,15 @@
 import React from 'react';
 import { HashRouter } from 'react-router-dom';
 import AppRoutes from './app/routes';
+import { QueryProvider } from './app/providers/QueryProvider';
 
 function App() {
   return (
-    <HashRouter>
-      <AppRoutes />
-    </HashRouter>
+    <QueryProvider>
+      <HashRouter>
+        <AppRoutes />
+      </HashRouter>
+    </QueryProvider>
   );
 }
 

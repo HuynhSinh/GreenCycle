@@ -8,5 +8,8 @@ export default function errorHandler(err, req, res, next) {
     console.error(err);
   }
 
-  res.status(statusCode).json({ message });
+  res.status(statusCode).json({
+    message,
+    error: message,
+  });
 }
