@@ -8,6 +8,7 @@ import CustomerDashboard from '../features/dashboard/pages/CustomerDashboard';
 import DriverDashboard from '../features/dashboard/pages/DriverDashboard';
 import CollectionScheduleManagement from '../features/collection-schedules/pages/CollectionScheduleManagement';
 import AdminRewardManagement from '../features/rewards/pages/AdminRewardManagement';
+import CustomerRewards from '../features/customerRewards/pages/CustomerRewards';
 
 export function AppRoutes() {
   return (
@@ -45,6 +46,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute requiredRole="CUSTOMER">
             <CustomerDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/customer/rewards"
+        element={
+          <ProtectedRoute requiredRole="CUSTOMER">
+            <CustomerRewards />
           </ProtectedRoute>
         }
       />

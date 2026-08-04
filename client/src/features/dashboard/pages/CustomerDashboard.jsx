@@ -116,7 +116,12 @@ export default function CustomerDashboard() {
             active
           />
           <NavItem icon={History} label="History" sidebarOpen={sidebarOpen} />
-          <NavItem icon={Award} label="Rewards" sidebarOpen={sidebarOpen} />
+          <NavItem
+            icon={Award}
+            label="Rewards"
+            sidebarOpen={sidebarOpen}
+            onClick={() => navigate('/dashboard/customer/rewards')}
+          />
         </nav>
 
         {/* Logout Button */}
@@ -371,9 +376,11 @@ export default function CustomerDashboard() {
   );
 }
 
-function NavItem({ icon: Icon, label, sidebarOpen, active }) {
+function NavItem({ icon: Icon, label, sidebarOpen, active, onClick }) {
   return (
     <button
+      type="button"
+      onClick={onClick}
       className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
         active ? "bg-white/20 text-white" : "text-emerald-100 hover:bg-white/10"
       }`}

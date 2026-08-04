@@ -66,15 +66,47 @@ export const findRewardById = (idReward) =>
     include: rewardInclude,
   });
 
-export const createReward = ({ reward, inventory }) =>
-  prisma.reward.create({
+export const findCustomerByAccountId = (idAccount) =>
+  prisma.customer.findUnique({
+    where: { idAccount },
+  });
+
+export const findWalletByCustomerId = (idCustomer) =>
+  prisma.ecoWallet.findUnique({
+    where: { idCustomer },
+    include: { transactions: true },
+  });
+
+export const createRewardExchange = ({ idCustomer, idReward, status, voucherCodeUsed }) =>
+  prisma.rewardExchange.create({
     data: {
-      ...reward,
-      inventory: {
-        create: inventory,
-      },
+      idCustomer,
+      idReward,
+      status,
+      voucherCodeUsed,
     },
-    include: rewardInclude,
+  });
+
+export const updateVoucherCode = ({ idVoucher, data }) =>
+  prisma.voucherCode.update({
+    where: { idVoucher },
+    data,
+  });
+
+export const updateWallet = ({ idWallet, data }) =>
+  prisma.ecoWallet.update({
+    where: { idWallet },
+    data,
+  });
+
+export const createTransaction = ({ idWallet, type, amount, description }) =>
+  prisma.transaction.create({
+    data: {
+      idWallet,
+      type,
+      amount,
+      description,
+    },
   });
 
 export const updateReward = ({ rewardId, reward, inventory }) =>
