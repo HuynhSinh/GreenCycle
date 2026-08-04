@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart3, Users, TrendingUp, AlertCircle, LogOut, Menu, X, CalendarDays } from 'lucide-react';
+import { Award, BarChart3, Users, TrendingUp, AlertCircle, LogOut, Menu, X, CalendarDays } from 'lucide-react';
 import { logout } from '../../auth/api/auth';
 import { useNavigate } from 'react-router-dom';
 
@@ -53,6 +53,7 @@ export default function AdminDashboard() {
           <NavItem icon={Users} label="Users" sidebarOpen={sidebarOpen} />
           <NavItem icon={CalendarDays} label="Schedules" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/schedules')} />
           <NavItem icon={TrendingUp} label="Pickups" sidebarOpen={sidebarOpen} />
+          <NavItem icon={Award} label="Rewards" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/rewards')} />
           <NavItem icon={AlertCircle} label="Reports" sidebarOpen={sidebarOpen} />
         </nav>
 

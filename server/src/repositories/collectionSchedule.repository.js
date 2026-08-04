@@ -1,6 +1,6 @@
 import { prisma } from "../config/db.js";
 
-export const findPickupRequestsForSchedule = ({ startDate, endDate, district, status }) => {
+const buildScheduleRequestWhere = ({ startDate, endDate, district, status }) => {
   const where = {
     scheduledTime: {
       gte: startDate,
@@ -21,8 +21,16 @@ export const findPickupRequestsForSchedule = ({ startDate, endDate, district, st
     where.status = status;
   }
 
+  return where;
+};
+
+export const findPickupRequestsForSchedule = ({ startDate, endDate, district, status, skip = 0, take = 20 }) => {
+  const where = buildScheduleRequestWhere({ startDate, endDate, district, status });
+
   return prisma.pickupRequest.findMany({
     where,
+    skip,
+    take,
     orderBy: [{ scheduledTime: "asc" }, { createdAt: "asc" }],
     include: {
       customer: true,
@@ -35,9 +43,30 @@ export const findPickupRequestsForSchedule = ({ startDate, endDate, district, st
       assignment: {
         include: {
           driver: true,
-          cluster: true,
         },
       },
+    },
+  });
+};
+
+export const countPickupRequestsForSchedule = ({ startDate, endDate, district, status }) =>
+  prisma.pickupRequest.count({
+    where: buildScheduleRequestWhere({ startDate, endDate, district, status }),
+  });
+
+export const countPickupRequestsByStatusForSchedule = ({ startDate, endDate, district, statuses }) => {
+  const where = buildScheduleRequestWhere({ startDate, endDate, district, status: "ALL" });
+
+  return prisma.pickupRequest.groupBy({
+    by: ["status"],
+    where: {
+      ...where,
+      status: {
+        in: statuses,
+      },
+    },
+    _count: {
+      _all: true,
     },
   });
 };
@@ -57,15 +86,6 @@ export const findDriversForSchedule = ({ startDate, endDate }) =>
         },
         include: {
           request: true,
-          cluster: true,
-        },
-      },
-      clusters: {
-        where: {
-          scheduledDate: {
-            gte: startDate,
-            lt: endDate,
-          },
         },
       },
     },
@@ -138,18 +158,18 @@ export const countDriverAssignmentsAtTime = ({ idDriver, scheduledTime, excludeR
     },
   });
 
-export const upsertAssignment = ({ requestId, driverId, clusterId, routeOrder }) =>
+export const upsertAssignment = ({ requestId, driverId, routeOrder }) =>
   prisma.pickupAssignment.upsert({
     where: { idRequest: requestId },
     create: {
       idRequest: requestId,
       idDriver: driverId,
-      idCluster: clusterId,
+      idCluster: null,
       routeOrder,
     },
     update: {
       idDriver: driverId,
-      idCluster: clusterId,
+      idCluster: null,
       routeOrder,
     },
   });

@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  Award,
   CalendarDays,
   CheckCircle2,
   Clock,
@@ -11,7 +12,6 @@ import {
   Menu,
   PackageCheck,
   Plus,
-  Route,
   Search,
   Truck,
   Users,
@@ -34,6 +34,8 @@ const statusStyles = {
   REJECTED: 'bg-rose-100 text-rose-800',
 };
 
+const PAGE_SIZE = 5;
+
 const getLocalDateInputValue = () => {
   const today = new Date();
   const year = today.getFullYear();
@@ -51,15 +53,21 @@ export default function CollectionScheduleManagement() {
   const [scheduleError, setScheduleError] = useState('');
   const [pickupRequests, setPickupRequests] = useState([]);
   const [drivers, setDrivers] = useState([]);
-  const [clusters, setClusters] = useState([]);
+  const [paginationData, setPaginationData] = useState({
+    page: 1,
+    limit: PAGE_SIZE,
+    total: 0,
+    totalPages: 1,
+    hasNextPage: false,
+  });
+  const [currentPage, setCurrentPage] = useState(1);
   const [metricsData, setMetricsData] = useState({
     requestsToSchedule: 0,
-    routesOpen: 0,
+    assignedPickups: 0,
     activeDrivers: 0,
     timeConflicts: 0,
   });
   const [scheduleDate, setScheduleDate] = useState(getLocalDateInputValue);
-  const [selectedClusterId, setSelectedClusterId] = useState('');
   const [panelOpen, setPanelOpen] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
@@ -71,7 +79,7 @@ export default function CollectionScheduleManagement() {
   const [selectedRequestId, setSelectedRequestId] = useState('');
   const [selectedDriverId, setSelectedDriverId] = useState('');
 
-  const loadSchedule = async () => {
+  const loadSchedule = useCallback(async () => {
     setScheduleLoading(true);
     setScheduleError('');
 
@@ -79,22 +87,30 @@ export default function CollectionScheduleManagement() {
       const response = await getCollectionSchedule({
         date: scheduleDate,
         district: 'District 5',
+        status: statusFilter,
+        page: currentPage,
+        limit: PAGE_SIZE,
       });
 
       const data = response.data;
       const nextRequests = (data.requests || []).map((request, index) => ({
         ...request,
-        displayId: `PK-${String(index + 1).padStart(4, '0')}`,
+        displayId: `PK-${String((currentPage - 1) * PAGE_SIZE + index + 1).padStart(4, '0')}`,
       }));
       const nextDrivers = data.drivers || [];
-      const nextClusters = data.clusters || [];
 
       setPickupRequests(nextRequests);
       setDrivers(nextDrivers);
-      setClusters(nextClusters);
+      setPaginationData(data.pagination || {
+        page: currentPage,
+        limit: PAGE_SIZE,
+        total: nextRequests.length,
+        totalPages: 1,
+        hasNextPage: false,
+      });
       setMetricsData(data.metrics || {
         requestsToSchedule: 0,
-        routesOpen: 0,
+        assignedPickups: 0,
         activeDrivers: 0,
         timeConflicts: 0,
       });
@@ -105,51 +121,38 @@ export default function CollectionScheduleManagement() {
       setSelectedDriverId((current) =>
         nextDrivers.some((driver) => driver.id === current) ? current : nextDrivers.find((driver) => driver.active)?.id || '',
       );
-      setSelectedClusterId((current) =>
-        nextClusters.some((cluster) => cluster.id === current) ? current : nextClusters[0]?.id || '',
-      );
     } catch (error) {
       setScheduleError(error.message || 'Could not load schedule data.');
       setPickupRequests([]);
       setDrivers([]);
-      setClusters([]);
       setMetricsData({
         requestsToSchedule: 0,
-        routesOpen: 0,
+        assignedPickups: 0,
         activeDrivers: 0,
         timeConflicts: 0,
       });
     } finally {
       setScheduleLoading(false);
     }
-  };
+  }, [currentPage, scheduleDate, statusFilter]);
 
   useEffect(() => {
     loadSchedule();
-  }, [scheduleDate]);
+  }, [loadSchedule]);
 
   const filteredRequests = useMemo(() => {
     return pickupRequests.filter((request) => {
-      const matchesStatus = statusFilter === 'ALL' || request.status === statusFilter;
       const matchesQuery = [request.displayId, request.customer, request.address, request.ward, request.items]
         .join(' ')
         .toLowerCase()
         .includes(query.toLowerCase());
 
-      return matchesStatus && matchesQuery;
+      return matchesQuery;
     });
-  }, [pickupRequests, query, statusFilter]);
+  }, [pickupRequests, query]);
 
   const selectedRequest = pickupRequests.find((request) => request.id === selectedRequestId);
   const selectedDriver = drivers.find((driver) => driver.id === selectedDriverId);
-
-  useEffect(() => {
-    if (selectedRequest?.clusterId) {
-      setSelectedClusterId(selectedRequest.clusterId);
-    } else {
-      setSelectedClusterId((current) => current || clusters[0]?.id || '');
-    }
-  }, [clusters, selectedRequest]);
 
   const handleLogout = async () => {
     setIsLoading(true);
@@ -166,7 +169,7 @@ export default function CollectionScheduleManagement() {
 
   const metrics = [
     { label: 'Requests to schedule', value: metricsData.requestsToSchedule, icon: CalendarDays, accent: 'emerald' },
-    { label: 'Routes open', value: metricsData.routesOpen, icon: Route, accent: 'sky' },
+    { label: 'Assigned pickups', value: metricsData.assignedPickups, icon: PackageCheck, accent: 'sky' },
     { label: 'Active drivers', value: metricsData.activeDrivers, icon: Truck, accent: 'indigo' },
     { label: 'Time conflicts', value: metricsData.timeConflicts, icon: AlertTriangle, accent: 'amber' },
   ];
@@ -200,7 +203,6 @@ export default function CollectionScheduleManagement() {
       const result = await assignCollectionSchedule({
         requestId: selectedRequest.id,
         driverId: selectedDriver.id,
-        clusterId: selectedClusterId || null,
       });
 
       setActionMessage(result.message || 'Pickup scheduled and assigned.');
@@ -263,6 +265,7 @@ export default function CollectionScheduleManagement() {
           <NavItem icon={Users} label="Users" sidebarOpen={sidebarOpen} />
           <NavItem icon={CalendarDays} label="Schedules" sidebarOpen={sidebarOpen} active />
           <NavItem icon={PackageCheck} label="Pickups" sidebarOpen={sidebarOpen} />
+          <NavItem icon={Award} label="Rewards" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/rewards')} />
           <NavItem icon={AlertTriangle} label="Reports" sidebarOpen={sidebarOpen} />
         </nav>
 
@@ -339,14 +342,17 @@ export default function CollectionScheduleManagement() {
                 <div className="flex flex-col gap-4 border-b border-slate-200 p-5 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900">Pickup Requests</h2>
-                    <p className="mt-1 text-sm text-slate-600">Filter, review, cluster, and assign District 5 pickups.</p>
+                    <p className="mt-1 text-sm text-slate-600">Filter, review, approve, reject, and assign District 5 pickups.</p>
                   </div>
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <label className="block sm:w-40">
                       <input
                         type="date"
                         value={scheduleDate}
-                        onChange={(event) => setScheduleDate(event.target.value)}
+                        onChange={(event) => {
+                          setCurrentPage(1);
+                          setScheduleDate(event.target.value);
+                        }}
                         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                       />
                     </label>
@@ -363,7 +369,10 @@ export default function CollectionScheduleManagement() {
                       <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <select
                         value={statusFilter}
-                        onChange={(event) => setStatusFilter(event.target.value)}
+                        onChange={(event) => {
+                          setCurrentPage(1);
+                          setStatusFilter(event.target.value);
+                        }}
                         className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                       >
                         <option value="ALL">All statuses</option>
@@ -384,7 +393,6 @@ export default function CollectionScheduleManagement() {
                         <TableHead>Request</TableHead>
                         <TableHead>Location</TableHead>
                         <TableHead>Preferred Window</TableHead>
-                        <TableHead>Cluster</TableHead>
                         <TableHead>Driver</TableHead>
                         <TableHead>Status</TableHead>
                       </tr>
@@ -435,7 +443,6 @@ export default function CollectionScheduleManagement() {
                                 {request.preferredTime}
                               </div>
                             </td>
-                            <td className="px-5 py-4 text-sm font-medium text-slate-800">{request.cluster}</td>
                             <td className="px-5 py-4 text-sm text-slate-700">{driver ? driver.name : 'Unassigned'}</td>
                             <td className="px-5 py-4">
                               <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[request.status] || 'bg-slate-100 text-slate-800'}`}>
@@ -447,7 +454,7 @@ export default function CollectionScheduleManagement() {
                       })}
                       {filteredRequests.length === 0 && (
                         <tr>
-                          <td colSpan="6" className="px-5 py-10 text-center text-sm font-medium text-slate-500">
+                          <td colSpan="5" className="px-5 py-10 text-center text-sm font-medium text-slate-500">
                             {scheduleLoading ? 'Loading schedule data...' : 'No pickup requests match these filters.'}
                           </td>
                         </tr>
@@ -455,20 +462,39 @@ export default function CollectionScheduleManagement() {
                     </tbody>
                   </table>
                 </div>
+                <div className="flex flex-col gap-3 border-t border-slate-200 px-5 py-4 text-sm font-medium text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                  <span>
+                    {paginationData.total > 0
+                      ? `Showing ${(paginationData.page - 1) * paginationData.limit + 1}-${Math.min(
+                          paginationData.page * paginationData.limit,
+                          paginationData.total,
+                        )} of ${paginationData.total} requests`
+                      : 'No requests to show'}
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                      disabled={scheduleLoading || paginationData.page <= 1}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <span className="min-w-24 text-center text-sm font-semibold text-slate-700">
+                      Page {paginationData.page} of {paginationData.totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((page) => page + 1)}
+                      disabled={scheduleLoading || !paginationData.hasNextPage}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                {clusters.map((cluster) => (
-                  <RouteColumn
-                    key={cluster.id}
-                    title={cluster.title}
-                    time={cluster.time}
-                    load={cluster.load}
-                    requests={pickupRequests.filter((request) => cluster.requestIds.includes(request.id))}
-                    warning={cluster.warning}
-                  />
-                ))}
-              </div>
             </div>
 
             {panelOpen && (
@@ -497,26 +523,6 @@ export default function CollectionScheduleManagement() {
                       Requested time: {selectedRequest.preferredTime}
                     </div>
                   </div>
-                )}
-
-                {showAssignmentControls && (
-                <div className="space-y-4">
-                  <label className="block">
-                    <span className="text-sm font-semibold text-slate-700">Route cluster</span>
-                    <select
-                      value={selectedClusterId}
-                      onChange={(event) => setSelectedClusterId(event.target.value)}
-                      className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                    >
-                      <option value="">No cluster</option>
-                      {clusters.map((cluster) => (
-                        <option key={cluster.id} value={cluster.id}>
-                          {cluster.title}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
                 )}
 
                 {showAssignmentControls ? (
@@ -661,42 +667,6 @@ export default function CollectionScheduleManagement() {
 
 function TableHead({ children }) {
   return <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-600">{children}</th>;
-}
-
-function RouteColumn({ title, time, load, requests, warning }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-          <p className="mt-1 text-sm text-slate-600">{time} - {load}</p>
-        </div>
-        <Route className="h-5 w-5 text-emerald-600" />
-      </div>
-      {warning && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
-          <AlertTriangle className="h-4 w-4" />
-          {warning}
-        </div>
-      )}
-      <div className="space-y-3">
-        {requests.map((request, index) => (
-          <div key={request.id} className="rounded-lg border border-slate-200 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-bold text-slate-950">{index + 1}. {request.displayId}</p>
-                <p className="mt-1 text-sm text-slate-600">{request.customer}</p>
-              </div>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                {request.scheduledTime}
-              </span>
-            </div>
-            <p className="mt-3 text-sm text-slate-600">{request.address}, {request.ward}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 function NavItem({ icon: Icon, label, sidebarOpen, active, onClick }) {

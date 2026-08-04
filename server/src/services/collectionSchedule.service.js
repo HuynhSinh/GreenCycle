@@ -23,12 +23,6 @@ const formatWeight = (weight) => {
   return `${rounded} kg`;
 };
 
-const routeTitle = (scheduledDate, district) => {
-  const hour = Number(formatTime(scheduledDate).slice(0, 2));
-  const period = hour < 12 ? "Morning" : hour < 17 ? "Afternoon" : "Evening";
-  return `${period} ${district} Route`;
-};
-
 const mapRequest = (request) => ({
   id: request.idRequest,
   customer: request.customer?.fullName || "Unknown customer",
@@ -40,10 +34,6 @@ const mapRequest = (request) => ({
   status: request.status,
   weight: formatWeight(request.totalWeight || request.wasteItems.reduce((total, item) => total + item.weight, 0)),
   items: request.wasteItems.map((item) => item.category?.name).filter(Boolean).join(", ") || "E-waste items",
-  cluster: request.assignment?.cluster
-    ? routeTitle(request.assignment.cluster.scheduledDate, request.assignment.cluster.district)
-    : "Unclustered",
-  clusterId: request.assignment?.idCluster || null,
   driverId: request.assignment?.idDriver || null,
   priority: request.totalWeight >= 15 ? "High" : "Normal",
 });
@@ -66,51 +56,55 @@ const mapDriver = (driver) => {
   };
 };
 
-const mapCluster = (cluster) => {
-  const requests = cluster.assignments.map((assignment) => mapRequest(assignment.request));
-  const totalWeight = requests.reduce((total, request) => total + Number.parseFloat(request.weight), 0);
+const getStatusCount = (statusCounts, status) =>
+  statusCounts.find((item) => item.status === status)?._count?._all || 0;
 
-  return {
-    id: cluster.idCluster,
-    title: routeTitle(cluster.scheduledDate, cluster.district),
-    time: formatTime(cluster.scheduledDate),
-    load: formatWeight(totalWeight),
-    status: cluster.status,
-    warning: cluster.assignments.length > 3 ? "High route density" : null,
-    requestIds: requests.map((request) => request.id),
-  };
-};
-
-const buildMetrics = (requests, drivers, clusters) => ({
-  requestsToSchedule: requests.filter((request) => ["PENDING", "VERIFYING", "APPROVED"].includes(request.status)).length,
-  routesOpen: clusters.filter((cluster) => cluster.status !== "CLOSED").length,
+const buildMetrics = (statusCounts, drivers) => ({
+  requestsToSchedule: ["PENDING", "VERIFYING", "APPROVED"].reduce(
+    (total, status) => total + getStatusCount(statusCounts, status),
+    0,
+  ),
+  assignedPickups: getStatusCount(statusCounts, "ASSIGNED"),
   activeDrivers: drivers.filter((driver) => driver.active).length,
   timeConflicts: drivers.filter((driver) => driver.conflict).length,
 });
 
-export const listSchedule = async ({ date, district = "District 5", status = "ALL" }) => {
+export const listSchedule = async ({ date, district = "District 5", status = "ALL", page = 1, limit = 20 }) => {
   const { startDate, endDate } = toDayRange(date);
+  const skip = (page - 1) * limit;
 
-  const [requestsRaw, driversRaw, clustersRaw] = await Promise.all([
-    collectionScheduleRepository.findPickupRequestsForSchedule({ startDate, endDate, district, status }),
+  const [requestsRaw, totalRequests, statusCounts, driversRaw] = await Promise.all([
+    collectionScheduleRepository.findPickupRequestsForSchedule({ startDate, endDate, district, status, skip, take: limit }),
+    collectionScheduleRepository.countPickupRequestsForSchedule({ startDate, endDate, district, status }),
+    collectionScheduleRepository.countPickupRequestsByStatusForSchedule({
+      startDate,
+      endDate,
+      district,
+      statuses: ["PENDING", "VERIFYING", "APPROVED", "ASSIGNED"],
+    }),
     collectionScheduleRepository.findDriversForSchedule({ startDate, endDate }),
-    collectionScheduleRepository.findClustersForSchedule({ startDate, endDate, district }),
   ]);
 
   const requests = requestsRaw.map(mapRequest);
   const drivers = driversRaw.map(mapDriver);
-  const clusters = clustersRaw.map(mapCluster);
+  const totalPages = Math.max(1, Math.ceil(totalRequests / limit));
 
   return {
-    metrics: buildMetrics(requests, drivers, clusters),
+    metrics: buildMetrics(statusCounts, drivers),
+    pagination: {
+      page,
+      limit,
+      total: totalRequests,
+      totalPages,
+      hasNextPage: page < totalPages,
+    },
     requests,
     drivers,
-    clusters,
     source: "database",
   };
 };
 
-export const assignSchedule = async ({ requestId, driverId, clusterId, routeOrder }, actorId) => {
+export const assignSchedule = async ({ requestId, driverId, routeOrder }, actorId) => {
   const [request, driver] = await Promise.all([
     collectionScheduleRepository.findPickupRequestById(requestId),
     collectionScheduleRepository.findDriverById(driverId),
@@ -150,7 +144,6 @@ export const assignSchedule = async ({ requestId, driverId, clusterId, routeOrde
     collectionScheduleRepository.upsertAssignment({
       requestId,
       driverId,
-      clusterId: clusterId || null,
       routeOrder,
     }),
     collectionScheduleRepository.createPickupTimeline({

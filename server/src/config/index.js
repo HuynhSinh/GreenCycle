@@ -71,4 +71,10 @@ export const config = {
     authWindowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
     authMax: Number(process.env.AUTH_RATE_LIMIT_MAX || 10),
   },
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
+    folder: process.env.CLOUDINARY_REWARD_FOLDER || "greencycle/rewards",
+  },
 };

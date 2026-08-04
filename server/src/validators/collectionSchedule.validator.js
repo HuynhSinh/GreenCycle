@@ -22,6 +22,8 @@ export const listCollectionScheduleSchema = z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     district: z.string().trim().min(1).max(80).optional(),
     status: z.enum(["ALL", ...pickupStatuses]).optional().default("ALL"),
+    page: z.coerce.number().int().positive().optional().default(1),
+    limit: z.coerce.number().int().min(1).max(50).optional().default(20),
   }),
 });
 
@@ -29,7 +31,6 @@ export const assignCollectionScheduleSchema = z.object({
   body: z.object({
     requestId: z.string().trim().min(1),
     driverId: z.string().trim().min(1),
-    clusterId: z.string().trim().min(1).nullable().optional(),
     routeOrder: z.number().int().positive().optional(),
   }),
 });
