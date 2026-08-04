@@ -1,7 +1,6 @@
 import dotenv from "dotenv";
 
-dotenv.config({ path: "../.env" });
-dotenv.config({ override: true });
+dotenv.config();
 
 const isTest = process.env.NODE_ENV === "test";
 const isProduction = process.env.NODE_ENV === "production";

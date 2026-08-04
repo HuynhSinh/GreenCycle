@@ -2,127 +2,152 @@
 
 A home-based e-waste collection and recycling platform.
 
----
-
-# Prerequisites
-
-Before running the project, make sure you have installed:
+## Prerequisites
 
 - Docker & Docker Compose
-- Node.js (v20 or later recommended)
+- Node.js v20 or later
 - npm
 
----
+## Environment Files
 
-# Getting Started
+The project uses environment files in these locations:
 
-## 1. Start the Database
+- Backend: `server/.env`
+- Frontend: `client/.env`
 
-From the project root directory, start the PostgreSQL database using Docker:
+Default local database:
 
-```bash
-docker compose up
+```env
+DATABASE_URL=postgresql://greencycle:greencycle123@localhost:5433/greencycle?schema=public
 ```
 
-> Keep this terminal running while using the application.
+Default local URLs:
 
----
+- Backend: `http://localhost:3000`
+- Frontend: `http://localhost:5173`
 
-## 2. Run the Backend
+## Quick Start With Scripts
 
-Open a new terminal and navigate to the backend directory:
+Run initial setup:
 
-```bash
-cd server
+```bat
+setup.bat
 ```
 
-Install dependencies:
+This will:
 
-```bash
-npm install
+- Start PostgreSQL with Docker
+- Install backend dependencies
+- Run Prisma migrations
+- Generate Prisma Client
+- Optionally seed demo data
+- Install frontend dependencies
+
+Start the project:
+
+```bat
+start.bat
 ```
 
-Push the Prisma schema to the database:
+This will:
+
+- Start PostgreSQL
+- Run pending Prisma migrations
+- Generate Prisma Client
+- Open backend and frontend in separate terminals
+
+## Manual Startup
+
+Use this when you want to run each system separately.
+
+### 1. Database
+
+From the project root:
 
 ```bash
-npx prisma db push
+docker compose up -d
 ```
 
-Generate the Prisma Client:
+Check that PostgreSQL is available on `localhost:5433`.
 
-```bash
-npx prisma generate
-```
+### 2. Backend
 
-Start the development server:
-
-```bash
-npm run dev
-```
-
----
-
-## 3. Run the Frontend
-
-Open another terminal and navigate to the frontend directory:
-
-```bash
-cd client
-```
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Start the development server:
-
-```bash
-npm run dev
-```
-
----
-
-# Project Startup Order
-
-Run the project in the following order:
-
-### 1. Start the database
-
-```bash
-docker compose up
-```
-
-### 2. Start the backend
+Open a new terminal:
 
 ```bash
 cd server
-
 npm install
-
-npx prisma db push
-
+npx prisma migrate deploy
 npx prisma generate
-
 npm run dev
 ```
 
-### 3. Start the frontend
+Backend runs on:
+
+```text
+http://localhost:3000
+```
+
+### 3. Frontend
+
+Open another terminal:
 
 ```bash
 cd client
-
 npm install
-
 npm run dev
 ```
 
----
+Frontend runs on:
 
-# Notes
+```text
+http://localhost:5173
+```
 
-- Ensure the database container is running before starting the backend.
-- `npx prisma db push` only needs to be run the first time or whenever the Prisma schema changes.
-- `npx prisma generate` should be run after any changes to the Prisma schema.
-- Make sure the `.env` files for both the `server` and `client` are configured correctly before running the application.
+## Seed Demo Data
+
+Seed data is optional and resets demo tables.
+
+```bash
+cd server
+npm run seed
+```
+
+Demo accounts are printed in the seed output.
+
+## Useful Commands
+
+Apply migrations:
+
+```bash
+cd server
+npx prisma migrate deploy
+```
+
+Create/apply a new local migration during development:
+
+```bash
+cd server
+npx prisma migrate dev
+```
+
+Regenerate Prisma Client:
+
+```bash
+cd server
+npx prisma generate
+```
+
+Build frontend:
+
+```bash
+cd client
+npm run build
+```
+
+## Notes
+
+- Use Prisma migrations, not `prisma db push`, because this project has migration history.
+- Run `npx prisma generate` after schema changes.
+- If an old local database was created with `db push`, you may need to reset the database before using migrations.
+- Keep Docker running while using the app.
