@@ -10,22 +10,24 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  PackageCheck,
   Plus,
   Search,
+  Trash2,
   Users,
   X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../auth/api/auth';
-import { createAdminReward, getAdminRewards, updateAdminReward } from '../api/rewards';
+import { createAdminReward, deleteAdminReward, getAdminRewards, updateAdminReward } from '../api/rewards';
+import { friendlyError, successText } from '../../../lib/messages';
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 
 const PAGE_SIZE = 5;
 
 const emptyForm = {
   name: '',
   description: '',
-  type: 'DIGITAL_VOUCHER',
+  type: 'PHYSICAL_PRODUCT',
   pointCost: '',
   partnerName: '',
   imageUrl: '',
@@ -57,11 +59,13 @@ export default function AdminRewardManagement() {
   const [actionLoading, setActionLoading] = useState(false);
   const [rewardError, setRewardError] = useState('');
   const [message, setMessage] = useState('');
+  const [formError, setFormError] = useState('');
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRewardId, setSelectedRewardId] = useState('');
   const [detailOpen, setDetailOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [form, setForm] = useState(emptyForm);
 
   const selectedReward = rewards.find((reward) => reward.id === selectedRewardId);
@@ -95,7 +99,7 @@ export default function AdminRewardManagement() {
       });
       setSelectedRewardId((current) => (nextRewards.some((reward) => reward.id === current) ? current : ''));
     } catch (error) {
-      setRewardError(error.message || 'Could not load rewards.');
+      setRewardError(friendlyError(error, 'Unable to load rewards. Please try again.'));
       setRewards([]);
     } finally {
       setRewardLoading(false);
@@ -133,6 +137,7 @@ export default function AdminRewardManagement() {
     setForm(rewardToForm(reward));
     setDetailOpen(true);
     setMessage('');
+    setFormError('');
   };
 
   const handleNewReward = () => {
@@ -140,6 +145,7 @@ export default function AdminRewardManagement() {
     setForm(emptyForm);
     setDetailOpen(true);
     setMessage('');
+    setFormError('');
   };
 
   const handleCloseDetail = () => {
@@ -147,6 +153,7 @@ export default function AdminRewardManagement() {
     setSelectedRewardId('');
     setForm(emptyForm);
     setMessage('');
+    setFormError('');
   };
 
   const handleChange = (field, value) => {
@@ -172,12 +179,13 @@ export default function AdminRewardManagement() {
     event.preventDefault();
 
     if (!form.name.trim() || Number(form.pointCost || 0) <= 0) {
-      setMessage('Reward name and point cost are required.');
+      setFormError('Please enter the reward name and required points.');
       return;
     }
 
     setActionLoading(true);
     setMessage('');
+    setFormError('');
 
     try {
       const payload = {
@@ -198,10 +206,34 @@ export default function AdminRewardManagement() {
 
       setSelectedRewardId(savedReward.id);
       setForm(rewardToForm(savedReward));
-      setMessage(selectedRewardId ? 'Reward item updated.' : 'Reward item created.');
+      setMessage(selectedRewardId ? 'Reward updated successfully.' : 'Reward created successfully.');
       await loadRewards();
     } catch (error) {
-      setMessage(error.message || 'Could not save reward item.');
+      setFormError(friendlyError(error, 'Unable to save this reward. Please check the information and try again.'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteReward = async () => {
+    if (!confirmDialog?.reward) return;
+
+    setActionLoading(true);
+    setMessage('');
+    setFormError('');
+
+    try {
+      const result = await deleteAdminReward(confirmDialog.reward.id);
+
+      setConfirmDialog(null);
+      setSelectedRewardId('');
+      setForm(emptyForm);
+      setDetailOpen(false);
+      setMessage(successText(result.message, 'Reward item deleted successfully.'));
+      await loadRewards();
+    } catch (error) {
+      setFormError(friendlyError(error, 'Unable to delete this reward item. It may already have redemption history.'));
+      setConfirmDialog(null);
     } finally {
       setActionLoading(false);
     }
@@ -233,9 +265,7 @@ export default function AdminRewardManagement() {
           <NavItem icon={LayoutDashboard} label="Dashboard" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin')} />
           <NavItem icon={Users} label="Drivers" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/drivers')} />
           <NavItem icon={CalendarDays} label="Schedules" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/schedules')} />
-          <NavItem icon={PackageCheck} label="Pickups" sidebarOpen={sidebarOpen} />
           <NavItem icon={Award} label="Rewards" sidebarOpen={sidebarOpen} active />
-          <NavItem icon={AlertTriangle} label="Reports" sidebarOpen={sidebarOpen} />
         </nav>
 
         <div className="border-t border-slate-800 p-4">
@@ -276,6 +306,16 @@ export default function AdminRewardManagement() {
           {rewardError && (
             <div className="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
               {rewardError}
+            </div>
+          )}
+          {message && (
+            <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+              {message}
+            </div>
+          )}
+          {formError && !detailOpen && (
+            <div className="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
+              {formError}
             </div>
           )}
 
@@ -329,7 +369,6 @@ export default function AdminRewardManagement() {
                       className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                     >
                       <option value="ALL">All types</option>
-                      <option value="DIGITAL_VOUCHER">Digital voucher</option>
                       <option value="PHYSICAL_PRODUCT">Physical product</option>
                     </select>
                   </label>
@@ -399,7 +438,7 @@ export default function AdminRewardManagement() {
                     {rewards.length === 0 && (
                       <tr>
                         <td colSpan="5" className="px-5 py-10 text-center text-sm font-medium text-slate-500">
-                          {rewardLoading ? 'Loading reward items...' : 'No reward items match these filters.'}
+                          {rewardLoading ? 'Loading rewards...' : 'No rewards match the current filters.'}
                         </td>
                       </tr>
                     )}
@@ -413,7 +452,7 @@ export default function AdminRewardManagement() {
                         paginationData.page * paginationData.limit,
                         paginationData.total,
                       )} of ${paginationData.total} items`
-                    : 'No items to show'}
+                    : 'No rewards to show'}
                 </span>
                 <div className="flex items-center gap-3">
                   <button
@@ -488,16 +527,10 @@ export default function AdminRewardManagement() {
                     />
                   </Field>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field label="Type" required>
-                      <select
-                        required
-                        value={form.type}
-                        onChange={(event) => handleChange('type', event.target.value)}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                      >
-                        <option value="DIGITAL_VOUCHER">Digital voucher</option>
-                        <option value="PHYSICAL_PRODUCT">Physical product</option>
-                      </select>
+                    <Field label="Type">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                        Physical product
+                      </div>
                     </Field>
                     <Field label="Point cost" required>
                       <input
@@ -539,9 +572,9 @@ export default function AdminRewardManagement() {
                   </label>
                 </div>
 
-                {message && (
-                  <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-                    {message}
+                {formError && (
+                  <div className="mt-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
+                    {formError}
                   </div>
                 )}
 
@@ -553,12 +586,38 @@ export default function AdminRewardManagement() {
                   <CheckCircle2 className="h-4 w-4" />
                   {actionLoading ? 'Saving...' : 'Save Reward'}
                 </button>
+                {selectedReward && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDialog({ type: 'deleteReward', reward: selectedReward })}
+                    disabled={actionLoading}
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-rose-600 px-4 py-3 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Reward
+                  </button>
+                )}
               </form>
             </aside>
             )}
           </section>
         </main>
       </div>
+
+      <ConfirmDialog
+        open={confirmDialog?.type === 'deleteReward'}
+        tone="danger"
+        title="Delete this reward item?"
+        description="This action removes the reward item and its inventory from the catalog. Rewards with redemption history cannot be deleted."
+        details={confirmDialog?.reward ? `${confirmDialog.reward.name} - ${currencyFormatter.format(confirmDialog.reward.pointCost)} points` : ''}
+        confirmLabel="Delete reward"
+        cancelLabel="Keep reward"
+        loading={actionLoading}
+        onClose={() => {
+          if (!actionLoading) setConfirmDialog(null);
+        }}
+        onConfirm={handleDeleteReward}
+      />
     </div>
   );
 }
@@ -569,7 +628,7 @@ function rewardToForm(reward) {
   return {
     name: reward.name || '',
     description: reward.description || '',
-    type: reward.type || 'DIGITAL_VOUCHER',
+    type: 'PHYSICAL_PRODUCT',
     pointCost: String(reward.pointCost || ''),
     partnerName: reward.partnerName || '',
     imageUrl: reward.imageUrl || '',
@@ -580,7 +639,7 @@ function rewardToForm(reward) {
 }
 
 function formatType(type) {
-  return type === 'DIGITAL_VOUCHER' ? 'Digital voucher' : 'Physical product';
+  return type === 'PHYSICAL_PRODUCT' ? 'Physical product' : 'Not available in MVP';
 }
 
 function Field({ label, children, required = false }) {

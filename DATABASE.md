@@ -45,7 +45,6 @@ Defines the account role:
 Tracks the full lifecycle of a pickup request:
 
 - `PENDING`: waiting for admin approval
-- `VERIFYING`: information is being verified
 - `APPROVED`: approved and waiting to be clustered
 - `ASSIGNED`: assigned to a driver and route
 - `COLLECTING`: driver is on the way

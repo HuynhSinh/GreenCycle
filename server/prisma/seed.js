@@ -105,22 +105,74 @@ async function createCustomerProfile({ account, fullName, phoneNumber, addressLi
   await prisma.ecoWallet.create({
     data: {
       idCustomer: customer.idCustomer,
-      balance: 150,
+      balance: 0,
     },
   });
 
   await prisma.greenPassport.create({
     data: {
       idCustomer: customer.idCustomer,
-      totalKg: 12.5,
-      totalCO2: 18.4,
-      totalPoints: 250,
-      level: 2,
-      badge: "Eco Warrior",
+      totalKg: 0,
+      totalCO2: 0,
+      totalPoints: 0,
+      level: 1,
+      badge: "Green Starter",
     },
   });
 
   return { customer, address };
+}
+
+async function createRewardCatalog() {
+  const toteBag = await prisma.reward.create({
+    data: {
+      name: "Recycled Cotton Tote Bag",
+      description: "Reusable tote bag made with recycled cotton for daily shopping.",
+      type: "PHYSICAL_PRODUCT",
+      pointCost: 220,
+      partnerName: "GreenCycle",
+      inventory: {
+        create: {
+          stockQuantity: 12,
+          isUnlimited: false,
+        },
+      },
+    },
+  });
+
+  const bottle = await prisma.reward.create({
+    data: {
+      name: "Stainless Steel Bottle",
+      description: "Durable reusable bottle for reducing single-use plastic.",
+      type: "PHYSICAL_PRODUCT",
+      pointCost: 320,
+      partnerName: "GreenCycle",
+      inventory: {
+        create: {
+          stockQuantity: 8,
+          isUnlimited: false,
+        },
+      },
+    },
+  });
+
+  const notebook = await prisma.reward.create({
+    data: {
+      name: "Recycled Paper Notebook",
+      description: "Notebook made from recycled paper for school and office notes.",
+      type: "PHYSICAL_PRODUCT",
+      pointCost: 90,
+      partnerName: "GreenCycle",
+      inventory: {
+        create: {
+          stockQuantity: 25,
+          isUnlimited: false,
+        },
+      },
+    },
+  });
+
+  return { toteBag, bottle, notebook };
 }
 
 async function createPickup({ customer, address, status, scheduledTime, totalWeight, categories, cluster, driver, routeOrder }) {
@@ -254,6 +306,7 @@ async function main() {
         vehicleInfo: "Van",
         licensePlate: "51A 902.18",
         maxCapacityKg: 80,
+        approvalStatus: "ACTIVE",
         isActive: true,
       },
     }),
@@ -265,6 +318,7 @@ async function main() {
         vehicleInfo: "Truck",
         licensePlate: "50H 117.45",
         maxCapacityKg: 180,
+        approvalStatus: "ACTIVE",
         isActive: true,
       },
     }),
@@ -276,6 +330,7 @@ async function main() {
         vehicleInfo: "Van",
         licensePlate: "51B 430.22",
         maxCapacityKg: 100,
+        approvalStatus: "ACTIVE",
         isActive: true,
       },
     }),
@@ -287,10 +342,13 @@ async function main() {
         vehicleInfo: "Bike",
         licensePlate: "59T1 834.91",
         maxCapacityKg: 35,
+        approvalStatus: "INACTIVE",
         isActive: false,
       },
     }),
   ]);
+
+  await createRewardCatalog();
 
   const morningCluster = await prisma.collectionCluster.create({
     data: {
@@ -349,7 +407,7 @@ async function main() {
   await createPickup({
     customer: customers[3].customer,
     address: customers[3].address,
-    status: "VERIFYING",
+    status: "PENDING",
     scheduledTime: new Date("2026-08-04T14:15:00+07:00"),
     totalWeight: 22,
     categories: [labDevice],

@@ -6,6 +6,7 @@ import {
   createRefreshToken,
   deleteExpiredRefreshTokensForAccount,
   deleteRefreshTokenByHash,
+  ensureCustomerProfileForAccount,
   findAccountByEmail,
   findAccountById,
   findAccountByUsername,
@@ -59,6 +60,7 @@ export const register = async (payload, req) => {
     password: passwordHash,
     role: "CUSTOMER",
   });
+  await ensureCustomerProfileForAccount(account);
   const tokens = await buildTokenPair(account, req, { rememberMe: Boolean(payload.rememberMe) });
 
   return {
@@ -80,6 +82,10 @@ export const login = async (payload, req) => {
 
   if (!account || !isValidPassword) {
     throw new AppError("Invalid email or password", 401);
+  }
+
+  if (account.role === "CUSTOMER") {
+    await ensureCustomerProfileForAccount(account);
   }
 
   const tokens = await buildTokenPair(account, req, { rememberMe: Boolean(payload.rememberMe) });
@@ -109,6 +115,10 @@ export const getMe = async (accountId) => {
 
   if (!account) {
     throw new AppError("Unauthorized", 401);
+  }
+
+  if (account.role === "CUSTOMER") {
+    await ensureCustomerProfileForAccount(account);
   }
 
   return toPublicAccount(account);

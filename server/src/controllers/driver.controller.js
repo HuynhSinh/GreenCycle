@@ -28,7 +28,7 @@ export const updateOwnProfile = asyncHandler(async (req, res) => {
     data: driver,
     message:
       currentDriver.status === "ACTIVE"
-        ? "Driver profile updated successfully"
+        ? "Driver profile updated and sent for admin approval"
         : "Driver profile submitted and waiting for admin approval",
   });
 });

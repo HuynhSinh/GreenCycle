@@ -8,7 +8,7 @@ const buildDriverWhere = ({ q, status }) => {
   if (status === "ACTIVE") {
     where.driver = {
       is: {
-        isActive: true,
+        approvalStatus: "ACTIVE",
       },
     };
   }
@@ -16,7 +16,15 @@ const buildDriverWhere = ({ q, status }) => {
   if (status === "INACTIVE") {
     where.driver = {
       is: {
-        isActive: false,
+        approvalStatus: "INACTIVE",
+      },
+    };
+  }
+
+  if (status === "PENDING_APPROVAL") {
+    where.driver = {
+      is: {
+        approvalStatus: "PENDING_APPROVAL",
       },
     };
   }
@@ -114,10 +122,10 @@ export const createDriverAccount = ({ account, driver }) =>
     include: accountInclude,
   });
 
-export const updateDriverActiveStatus = ({ idDriver, isActive }) =>
+export const updateDriverActiveStatus = ({ idDriver, isActive, approvalStatus }) =>
   prisma.driver.update({
     where: { idDriver },
-    data: { isActive },
+    data: { isActive, approvalStatus },
   });
 
 export const updateOwnDriverProfile = ({ idAccount, email, driver }) =>
@@ -132,10 +140,13 @@ export const updateOwnDriverProfile = ({ idAccount, email, driver }) =>
       create: {
         ...driver,
         idAccount,
+        approvalStatus: "PENDING_APPROVAL",
         isActive: false,
       },
       update: {
         ...driver,
+        approvalStatus: "PENDING_APPROVAL",
+        isActive: false,
       },
     });
 

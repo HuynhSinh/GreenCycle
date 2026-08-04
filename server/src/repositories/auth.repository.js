@@ -20,6 +20,44 @@ export const createAccount = (data) =>
     data,
   });
 
+export const ensureCustomerProfileForAccount = ({ idAccount, username }) =>
+  prisma.$transaction(async (tx) => {
+    const customer = await tx.customer.upsert({
+      where: { idAccount },
+      create: {
+        idAccount,
+        fullName: username,
+        phoneNumber: `PENDING-${idAccount.slice(0, 24)}`,
+        isEnterprise: false,
+      },
+      update: {},
+    });
+
+    await tx.ecoWallet.upsert({
+      where: { idCustomer: customer.idCustomer },
+      create: {
+        idCustomer: customer.idCustomer,
+        balance: 0,
+      },
+      update: {},
+    });
+
+    await tx.greenPassport.upsert({
+      where: { idCustomer: customer.idCustomer },
+      create: {
+        idCustomer: customer.idCustomer,
+        totalKg: 0,
+        totalCO2: 0,
+        totalPoints: 0,
+        level: 1,
+        badge: "Green Starter",
+      },
+      update: {},
+    });
+
+    return customer;
+  });
+
 export const createRefreshToken = (data) =>
   prisma.refreshToken.create({
     data,

@@ -19,7 +19,6 @@ enum UserRole {
 
 enum PickupStatus {
   PENDING           // Chờ Admin duyệt
-  VERIFYING         // Đang xác minh thông tin
   APPROVED          // Đã duyệt, chờ gom cụm (cluster)
   ASSIGNED          // Đã gán cho tài xế & lộ trình
   COLLECTING        // Tài xế đang trên đường đến
@@ -111,6 +110,7 @@ model Driver {
   vehicleInfo   String?
   licensePlate  String?
   maxCapacityKg Float    @default(0)
+  approvalStatus String   @default("PENDING_APPROVAL") // PENDING_APPROVAL, ACTIVE, INACTIVE
   isActive      Boolean  @default(true)
   currentLat    Float?
   currentLng    Float?

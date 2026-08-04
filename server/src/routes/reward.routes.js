@@ -3,6 +3,7 @@ import { requireAuth, requireRole } from "../middlewares/auth.middleware.js";
 import { validate } from "../middlewares/validate.middleware.js";
 import {
   createRewardSchema,
+  deleteRewardSchema,
   listRewardsSchema,
   updateRewardInventorySchema,
   updateRewardSchema,
@@ -41,6 +42,14 @@ router.patch(
   requireRole("ADMIN"),
   validate(updateRewardInventorySchema),
   rewardController.updateInventory,
+);
+
+router.delete(
+  "/admin/rewards/:rewardId",
+  requireAuth,
+  requireRole("ADMIN"),
+  validate(deleteRewardSchema),
+  rewardController.remove,
 );
 
 export default router;

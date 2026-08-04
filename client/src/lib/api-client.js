@@ -1,3 +1,5 @@
+import { friendlyError } from './messages';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export class ApiError extends Error {
@@ -22,7 +24,7 @@ export async function apiRequest(path, options = {}) {
   const data = contentType.includes('application/json') ? await response.json() : null;
 
   if (!response.ok) {
-    throw new ApiError(data?.message || 'Request failed', response.status);
+    throw new ApiError(friendlyError(data?.message || 'Request failed'), response.status);
   }
 
   return data;

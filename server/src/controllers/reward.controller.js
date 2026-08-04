@@ -20,3 +20,8 @@ export const updateInventory = asyncHandler(async (req, res) => {
   const reward = await rewardService.updateRewardInventory(req.validated.params.rewardId, req.validated.body);
   res.json({ data: reward });
 });
+
+export const remove = asyncHandler(async (req, res) => {
+  const result = await rewardService.deleteReward(req.validated.params.rewardId);
+  res.json(result);
+});

@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { register as registerAccount } from '../api/auth';
 import { signupSchema, calculatePasswordStrength } from '../../../lib/validators';
+import { friendlyError } from '../../../lib/messages';
 
 export function SignUpForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -40,7 +41,7 @@ export function SignUpForm() {
       await registerAccount(data);
       setRegStatus({
         success: true,
-        message: 'Registration successful! Redirecting you to login...',
+        message: 'Account created successfully. You can now sign in and create pickup requests.',
       });
       setTimeout(() => {
         navigate('/login');
@@ -48,7 +49,7 @@ export function SignUpForm() {
     } catch (error) {
       setRegStatus({
         success: false,
-        message: error.message || 'Registration failed. Please try again.',
+        message: friendlyError(error, 'Unable to create your account. Please check the information and try again.'),
       });
     } finally {
       setIsLoading(false);

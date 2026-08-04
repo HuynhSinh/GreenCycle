@@ -90,7 +90,7 @@ const getStatusCount = (statusCounts, status) =>
   statusCounts.find((item) => item.status === status)?._count?._all || 0;
 
 const buildMetrics = (statusCounts, drivers) => ({
-  requestsToSchedule: ["PENDING", "VERIFYING", "APPROVED"].reduce(
+  requestsToSchedule: ["PENDING", "APPROVED"].reduce(
     (total, status) => total + getStatusCount(statusCounts, status),
     0,
   ),
@@ -110,7 +110,7 @@ export const listSchedule = async ({ date, district = "", status = "ALL", page =
       startDate,
       endDate,
       district,
-      statuses: ["PENDING", "VERIFYING", "APPROVED", "ASSIGNED"],
+      statuses: ["PENDING", "APPROVED", "ASSIGNED"],
     }),
     collectionScheduleRepository.findDriversForSchedule({ startDate, endDate }),
   ]);
@@ -213,8 +213,8 @@ export const approveSchedule = async (requestId, actorId) => {
     throw new AppError("Pickup request not found", 404);
   }
 
-  if (!["PENDING", "VERIFYING", "APPROVED"].includes(request.status)) {
-    throw new AppError("Only pending or verifying requests can be approved", 409);
+  if (!["PENDING", "APPROVED"].includes(request.status)) {
+    throw new AppError("Only pending requests can be approved", 409);
   }
 
   if (request.status === "APPROVED") {
@@ -244,8 +244,8 @@ export const rejectSchedule = async (requestId, reason, actorId) => {
     throw new AppError("Pickup request not found", 404);
   }
 
-  if (!["PENDING", "VERIFYING", "APPROVED"].includes(request.status)) {
-    throw new AppError("Only pending, verifying, or approved requests can be rejected", 409);
+  if (!["PENDING", "APPROVED"].includes(request.status)) {
+    throw new AppError("Only pending or approved requests can be rejected", 409);
   }
 
   await collectionScheduleRepository.runInTransaction([

@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, LogIn, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { login } from '../api/auth';
 import { loginSchema } from '../../../lib/validators';
+import { friendlyError } from '../../../lib/messages';
 
 export function LoginForm() {
   const navigate = useNavigate();
@@ -33,16 +34,13 @@ export function LoginForm() {
     try {
       const response = await login(data);
       
-      // Cookies đã được set bởi backend (HTTP-only)
-      // Lưu user info vào localStorage
       localStorage.setItem('userInfo', JSON.stringify(response.user));
 
       setAuthStatus({
         success: true,
-        message: 'Successfully authenticated. Redirecting...',
+        message: 'Signed in successfully. Opening your workspace...',
       });
 
-      // Redirect dựa vào role sau 1 giây
       setTimeout(() => {
         const dashboardPaths = {
           ADMIN: '/dashboard/admin',
@@ -55,7 +53,7 @@ export function LoginForm() {
     } catch (error) {
       setAuthStatus({
         success: false,
-        message: error.message || 'Invalid username/email or password.',
+        message: friendlyError(error, 'Unable to sign in. Please check your email, username, and password.'),
       });
     } finally {
       setIsLoading(false);
@@ -102,7 +100,7 @@ export function LoginForm() {
           GreenCycle
         </h1>
         <p className="text-[14px] text-slate-500 font-medium">
-          Sign in to the ESG Admin Portal
+          Sign in to the GreenCycle Portal
         </p>
       </div>
 
@@ -265,7 +263,7 @@ export function LoginForm() {
       <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-center gap-2">
         <ShieldCheck className="w-4 h-4 text-slate-400" />
         <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">
-          Secure Enterprise Authentication
+          Secure GreenCycle Authentication
         </span>
       </div>
     </div>

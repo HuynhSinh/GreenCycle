@@ -1,7 +1,9 @@
 import { prisma } from "../config/db.js";
 
 const buildRewardWhere = ({ q, type }) => {
-  const where = {};
+  const where = {
+    type: type && type !== "ALL" ? type : "PHYSICAL_PRODUCT",
+  };
 
   if (q) {
     where.OR = [
@@ -9,10 +11,6 @@ const buildRewardWhere = ({ q, type }) => {
       { partnerName: { contains: q, mode: "insensitive" } },
       { description: { contains: q, mode: "insensitive" } },
     ];
-  }
-
-  if (type && type !== "ALL") {
-    where.type = type;
   }
 
   return where;
@@ -43,6 +41,7 @@ export const countRewards = ({ q, type }) =>
 export const countAvailableRewards = () =>
   prisma.reward.count({
     where: {
+      type: "PHYSICAL_PRODUCT",
       OR: [
         { inventory: { is: { isUnlimited: true } } },
         { inventory: { is: { stockQuantity: { gt: 0 } } } },
@@ -56,6 +55,9 @@ export const countLowStockRewards = () =>
       isUnlimited: false,
       stockQuantity: {
         lte: 10,
+      },
+      reward: {
+        type: "PHYSICAL_PRODUCT",
       },
     },
   });
@@ -104,4 +106,31 @@ export const updateRewardInventory = ({ rewardId, inventory }) =>
       ...inventory,
     },
     update: inventory,
+  });
+
+export const countRewardExchanges = (rewardId) =>
+  prisma.rewardExchange.count({
+    where: { idReward: rewardId },
+  });
+
+export const deleteReward = (rewardId) =>
+  prisma.$transaction(async (tx) => {
+    const inventory = await tx.rewardInventory.findUnique({
+      where: { idReward: rewardId },
+      select: { idInventory: true },
+    });
+
+    if (inventory) {
+      await tx.voucherCode.deleteMany({
+        where: { idInventory: inventory.idInventory },
+      });
+
+      await tx.rewardInventory.delete({
+        where: { idInventory: inventory.idInventory },
+      });
+    }
+
+    await tx.reward.delete({
+      where: { idReward: rewardId },
+    });
   });

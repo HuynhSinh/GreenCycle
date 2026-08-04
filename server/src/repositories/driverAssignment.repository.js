@@ -74,19 +74,60 @@ export const countInProgressAssignments = ({ idDriver, excludeAssignmentId }) =>
     },
   });
 
+const passportProgress = (totalPoints) => {
+  if (totalPoints >= 5000) return { level: 5, badge: "Earth Guardian" };
+  if (totalPoints >= 2500) return { level: 4, badge: "Circular Champion" };
+  if (totalPoints >= 1000) return { level: 3, badge: "Green Hero" };
+  if (totalPoints >= 250) return { level: 2, badge: "Eco Warrior" };
+  return { level: 1, badge: "Green Starter" };
+};
+
+const statusTransitionGuards = {
+  COLLECTING: ["ASSIGNED"],
+  ARRIVED: ["COLLECTING"],
+  COLLECTED: ["COLLECTING", "ARRIVED"],
+  FAILED: ["ASSIGNED", "COLLECTING", "ARRIVED"],
+};
+
+const assignmentConflict = (code) => Object.assign(new Error(code), { code });
+
 export const updateAssignmentResult = ({ requestId, status, note, createdBy, items = [], evidenceImages = [] }) =>
   prisma.$transaction(async (tx) => {
-    await tx.pickupRequest.update({
-      where: { idRequest: requestId },
+    const totalWeight = items.reduce((total, item) => total + item.actualWeight, 0);
+    const totalPoints = items.reduce((total, item) => total + item.pointsEarned, 0);
+    const totalCO2 = items.reduce((total, item) => total + (item.co2Reduced || 0), 0);
+    const allowedCurrentStatuses = statusTransitionGuards[status];
+
+    const pickupUpdate = await tx.pickupRequest.updateMany({
+      where: {
+        idRequest: requestId,
+        ...(allowedCurrentStatuses ? { status: { in: allowedCurrentStatuses } } : {}),
+      },
       data: {
         status,
         ...(status === "COLLECTED"
           ? {
-              totalWeight: items.reduce((total, item) => total + item.actualWeight, 0),
+              totalWeight,
+              totalPoints,
             }
           : {}),
       },
     });
+
+    if (pickupUpdate.count !== 1) {
+      throw assignmentConflict("INVALID_ASSIGNMENT_STATUS_TRANSITION");
+    }
+
+    const pickup = await tx.pickupRequest.findUnique({
+      where: { idRequest: requestId },
+      select: {
+        idCustomer: true,
+      },
+    });
+
+    if (!pickup) {
+      throw assignmentConflict("ASSIGNMENT_NOT_FOUND");
+    }
 
     for (const item of items) {
       await tx.wasteItem.update({
@@ -102,6 +143,55 @@ export const updateAssignmentResult = ({ requestId, status, note, createdBy, ite
       await tx.wasteImage.createMany({
         data: evidenceImages,
       });
+    }
+
+    if (status === "COLLECTED") {
+      const passport = await tx.greenPassport.upsert({
+        where: { idCustomer: pickup.idCustomer },
+        create: {
+          idCustomer: pickup.idCustomer,
+          totalKg: totalWeight,
+          totalCO2,
+          totalPoints,
+          ...passportProgress(totalPoints),
+        },
+        update: {
+          totalKg: { increment: totalWeight },
+          totalCO2: { increment: totalCO2 },
+          totalPoints: { increment: totalPoints },
+        },
+      });
+
+      const progress = passportProgress(passport.totalPoints);
+
+      if (passport.level !== progress.level || passport.badge !== progress.badge) {
+        await tx.greenPassport.update({
+          where: { idPassport: passport.idPassport },
+          data: progress,
+        });
+      }
+
+      if (totalPoints > 0) {
+        const wallet = await tx.ecoWallet.upsert({
+          where: { idCustomer: pickup.idCustomer },
+          create: {
+            idCustomer: pickup.idCustomer,
+            balance: totalPoints,
+          },
+          update: {
+            balance: { increment: totalPoints },
+          },
+        });
+
+        await tx.transaction.create({
+          data: {
+            idWallet: wallet.idWallet,
+            type: "EARN_RECYCLING",
+            amount: totalPoints,
+            description: `Eco-points earned from collected pickup ${requestId}`,
+          },
+        });
+      }
     }
 
     await tx.pickupTimeline.create({

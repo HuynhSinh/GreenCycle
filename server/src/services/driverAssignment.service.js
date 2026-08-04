@@ -138,6 +138,7 @@ export const updateOwnAssignmentStatus = async (accountId, assignmentId, payload
         wasteItemId: item.wasteItemId,
         actualWeight: item.actualWeight,
         pointsEarned: Math.round(item.actualWeight * (scheduledItem.category?.pointFactor || 0)),
+        co2Reduced: item.actualWeight * (scheduledItem.category?.co2Factor || 0),
       });
     }
 
@@ -148,14 +149,26 @@ export const updateOwnAssignmentStatus = async (accountId, assignmentId, payload
     });
   }
 
-  await driverAssignmentRepository.updateAssignmentResult({
-    requestId: assignment.request.idRequest,
-    status: payload.status,
-    note: payload.note || `Driver updated pickup to ${payload.status}`,
-    createdBy: accountId,
-    items,
-    evidenceImages,
-  });
+  try {
+    await driverAssignmentRepository.updateAssignmentResult({
+      requestId: assignment.request.idRequest,
+      status: payload.status,
+      note: payload.note || `Driver updated pickup to ${payload.status}`,
+      createdBy: accountId,
+      items,
+      evidenceImages,
+    });
+  } catch (error) {
+    if (error.code === "INVALID_ASSIGNMENT_STATUS_TRANSITION") {
+      throw new AppError("This assignment status has already changed. Please refresh and try again.", 409);
+    }
+
+    if (error.code === "ASSIGNMENT_NOT_FOUND") {
+      throw new AppError("Assignment not found", 404);
+    }
+
+    throw error;
+  }
 
   const updatedAssignment = await driverAssignmentRepository.findAssignmentForDriver({
     idAssignment: assignmentId,

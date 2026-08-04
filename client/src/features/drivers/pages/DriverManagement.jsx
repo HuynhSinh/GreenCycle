@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  PackageCheck,
   Plus,
   Search,
   ToggleLeft,
@@ -25,6 +24,8 @@ import {
   disableAdminDriver,
   getAdminDrivers,
 } from '../api/drivers';
+import { friendlyError, successText } from '../../../lib/messages';
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 
 const PAGE_SIZE = 5;
 
@@ -40,9 +41,10 @@ const emptyForm = {
 };
 
 const statusStyles = {
-  ACTIVE: 'bg-emerald-100 text-emerald-800',
-  INACTIVE: 'bg-slate-100 text-slate-700',
-  PENDING_PROFILE: 'bg-amber-100 text-amber-800',
+  ACTIVE: 'border border-emerald-300 bg-emerald-50 text-emerald-800',
+  INACTIVE: 'border border-slate-300 bg-slate-100 text-slate-700',
+  PENDING_APPROVAL: 'border border-amber-300 bg-amber-50 text-amber-900',
+  PENDING_PROFILE: 'border border-rose-300 bg-rose-50 text-rose-800',
 };
 
 export default function DriverManagement() {
@@ -54,6 +56,7 @@ export default function DriverManagement() {
     totalDrivers: 0,
     activeDrivers: 0,
     inactiveDrivers: 0,
+    pendingApproval: 0,
     pendingProfiles: 0,
   });
   const [paginationData, setPaginationData] = useState({
@@ -70,9 +73,11 @@ export default function DriverManagement() {
   const [actionLoading, setActionLoading] = useState(false);
   const [driverError, setDriverError] = useState('');
   const [message, setMessage] = useState('');
+  const [actionError, setActionError] = useState('');
   const [selectedDriverId, setSelectedDriverId] = useState('');
   const [detailOpen, setDetailOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [form, setForm] = useState(emptyForm);
 
   const selectedDriver = drivers.find((driver) => driver.id === selectedDriverId);
@@ -96,6 +101,7 @@ export default function DriverManagement() {
         totalDrivers: 0,
         activeDrivers: 0,
         inactiveDrivers: 0,
+        pendingApproval: 0,
         pendingProfiles: 0,
       });
       setPaginationData(data.pagination || {
@@ -107,7 +113,7 @@ export default function DriverManagement() {
       });
       setSelectedDriverId((current) => (nextDrivers.some((driver) => driver.id === current) ? current : ''));
     } catch (error) {
-      setDriverError(error.message || 'Could not load drivers.');
+      setDriverError(friendlyError(error, 'Unable to load drivers. Please try again.'));
       setDrivers([]);
     } finally {
       setDriversLoading(false);
@@ -123,7 +129,8 @@ export default function DriverManagement() {
       { label: 'Driver accounts', value: metricsData.totalDrivers, icon: Users, accent: 'emerald' },
       { label: 'Active drivers', value: metricsData.activeDrivers, icon: Truck, accent: 'sky' },
       { label: 'Inactive drivers', value: metricsData.inactiveDrivers, icon: ToggleLeft, accent: 'slate' },
-      { label: 'Pending profiles', value: metricsData.pendingProfiles, icon: AlertTriangle, accent: 'amber' },
+      { label: 'Pending approval', value: metricsData.pendingApproval, icon: AlertTriangle, accent: 'amber' },
+      { label: 'Missing profiles', value: metricsData.pendingProfiles, icon: AlertTriangle, accent: 'rose' },
     ],
     [metricsData],
   );
@@ -146,6 +153,7 @@ export default function DriverManagement() {
     setDetailOpen(true);
     setCreateOpen(false);
     setMessage('');
+    setActionError('');
   };
 
   const handleOpenCreate = () => {
@@ -154,6 +162,7 @@ export default function DriverManagement() {
     setDetailOpen(false);
     setSelectedDriverId('');
     setMessage('');
+    setActionError('');
   };
 
   const handleClosePanel = () => {
@@ -161,6 +170,7 @@ export default function DriverManagement() {
     setDetailOpen(false);
     setSelectedDriverId('');
     setMessage('');
+    setActionError('');
   };
 
   const handleFormChange = (field, value) => {
@@ -171,6 +181,7 @@ export default function DriverManagement() {
     event.preventDefault();
     setActionLoading(true);
     setMessage('');
+    setActionError('');
 
     try {
       const payload = {
@@ -185,14 +196,14 @@ export default function DriverManagement() {
       };
       const result = await createAdminDriver(payload);
 
-      setMessage('Driver account created.');
+      setMessage('Driver account created. The driver can sign in and update their profile.');
       setForm(emptyForm);
       setCreateOpen(false);
       setSelectedDriverId(result.data.id);
       setDetailOpen(true);
       await loadDrivers();
     } catch (error) {
-      setMessage(error.message || 'Could not create driver account.');
+      setActionError(friendlyError(error, 'Unable to create this driver account. Please check the information and try again.'));
     } finally {
       setActionLoading(false);
     }
@@ -203,6 +214,7 @@ export default function DriverManagement() {
 
     setActionLoading(true);
     setMessage('');
+    setActionError('');
 
     try {
       const actions = {
@@ -211,13 +223,18 @@ export default function DriverManagement() {
       };
       const result = await actions[action](selectedDriver.id);
 
-      setMessage(result.message || 'Driver updated.');
+      setMessage(successText(result.message, action === 'approve' ? 'Driver approved and activated.' : 'Driver disabled.'));
       await loadDrivers();
     } catch (error) {
-      setMessage(error.message || 'Could not update driver.');
+      setActionError(friendlyError(error, 'Unable to update this driver status. Please try again.'));
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleConfirmDriverDisable = async () => {
+    await handleDriverAction('disable');
+    setConfirmDialog(null);
   };
 
   const accentClasses = {
@@ -225,6 +242,7 @@ export default function DriverManagement() {
     sky: 'bg-sky-50 text-sky-600',
     slate: 'bg-slate-100 text-slate-600',
     amber: 'bg-amber-50 text-amber-600',
+    rose: 'bg-rose-50 text-rose-600',
   };
 
   return (
@@ -247,9 +265,7 @@ export default function DriverManagement() {
           <NavItem icon={LayoutDashboard} label="Dashboard" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin')} />
           <NavItem icon={Users} label="Drivers" sidebarOpen={sidebarOpen} active />
           <NavItem icon={CalendarDays} label="Schedules" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/schedules')} />
-          <NavItem icon={PackageCheck} label="Pickups" sidebarOpen={sidebarOpen} />
           <NavItem icon={Award} label="Rewards" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/rewards')} />
-          <NavItem icon={AlertTriangle} label="Reports" sidebarOpen={sidebarOpen} />
         </nav>
 
         <div className="border-t border-slate-800 p-4">
@@ -317,7 +333,7 @@ export default function DriverManagement() {
               <div className="flex flex-col gap-4 border-b border-slate-200 p-5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">Drivers</h2>
-                  <p className="mt-1 text-sm text-slate-600">Search, filter, approve, enable, or disable driver accounts.</p>
+                  <p className="mt-1 text-sm text-slate-600">Search, filter, approve, or disable driver accounts.</p>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <label className="relative block min-w-0 sm:w-72">
@@ -345,6 +361,7 @@ export default function DriverManagement() {
                       <option value="ALL">All statuses</option>
                       <option value="ACTIVE">Active</option>
                       <option value="INACTIVE">Inactive</option>
+                      <option value="PENDING_APPROVAL">Pending approval</option>
                       <option value="PENDING_PROFILE">Pending profile</option>
                     </select>
                   </label>
@@ -393,7 +410,7 @@ export default function DriverManagement() {
                           </td>
                           <td className="px-5 py-4">
                             <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[driver.status]}`}>
-                              {driver.status}
+                              {formatDriverStatus(driver.status)}
                             </span>
                           </td>
                         </tr>
@@ -402,7 +419,7 @@ export default function DriverManagement() {
                     {drivers.length === 0 && (
                       <tr>
                         <td colSpan="5" className="px-5 py-10 text-center text-sm font-medium text-slate-500">
-                          {driversLoading ? 'Loading drivers...' : 'No drivers match these filters.'}
+                          {driversLoading ? 'Loading drivers...' : 'No drivers match the current filters.'}
                         </td>
                       </tr>
                     )}
@@ -469,7 +486,7 @@ export default function DriverManagement() {
                   <Info label="Assignments" value={selectedDriver.driver ? `${selectedDriver.driver.activeAssignments} active / ${selectedDriver.driver.totalAssignments} total` : 'No profile'} />
                   <div>
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[selectedDriver.status]}`}>
-                      {selectedDriver.status}
+                      {formatDriverStatus(selectedDriver.status)}
                     </span>
                   </div>
                 </div>
@@ -479,12 +496,17 @@ export default function DriverManagement() {
                     {message}
                   </div>
                 )}
+                {actionError && (
+                  <div className="mt-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
+                    {actionError}
+                  </div>
+                )}
 
                 <div className="mt-6 grid grid-cols-1 gap-3">
                   {selectedDriver.status === 'ACTIVE' ? (
                     <button
                       type="button"
-                      onClick={() => handleDriverAction('disable')}
+                      onClick={() => setConfirmDialog({ type: 'disableDriver', driver: selectedDriver })}
                       disabled={actionLoading || !selectedDriver.profileComplete}
                       className="flex items-center justify-center gap-2 rounded-lg border border-rose-600 px-4 py-3 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400"
                     >
@@ -499,7 +521,7 @@ export default function DriverManagement() {
                       className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
                       <UserCheck className="h-4 w-4" />
-                      Approve Driver
+                      {selectedDriver.status === 'PENDING_APPROVAL' ? 'Approve Driver' : 'Reactivate Driver'}
                     </button>
                   )}
                 </div>
@@ -554,6 +576,11 @@ export default function DriverManagement() {
                       {message}
                     </div>
                   )}
+                  {actionError && (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
+                      {actionError}
+                    </div>
+                  )}
 
                   <button
                     type="submit"
@@ -569,6 +596,21 @@ export default function DriverManagement() {
           </section>
         </main>
       </div>
+
+      <ConfirmDialog
+        open={confirmDialog?.type === 'disableDriver'}
+        tone="danger"
+        title="Disable this driver?"
+        description="This driver will not be able to receive new assignments until an admin reactivates the account."
+        details={confirmDialog?.driver ? `${confirmDialog.driver.driver?.fullName || confirmDialog.driver.username} - ${confirmDialog.driver.email}` : ''}
+        confirmLabel="Disable driver"
+        cancelLabel="Keep active"
+        loading={actionLoading}
+        onClose={() => {
+          if (!actionLoading) setConfirmDialog(null);
+        }}
+        onConfirm={handleConfirmDriverDisable}
+      />
     </div>
   );
 }
@@ -596,6 +638,17 @@ function Field({ label, children, required = false }) {
 
 function TableHead({ children }) {
   return <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-600">{children}</th>;
+}
+
+function formatDriverStatus(status) {
+  const labels = {
+    ACTIVE: 'Active',
+    INACTIVE: 'Inactive',
+    PENDING_APPROVAL: 'Pending approval',
+    PENDING_PROFILE: 'Pending profile',
+  };
+
+  return labels[status] || status;
 }
 
 function NavItem({ icon: Icon, label, sidebarOpen, active, onClick }) {

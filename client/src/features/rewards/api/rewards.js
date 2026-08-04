@@ -31,3 +31,9 @@ export function updateAdminRewardInventory(rewardId, payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export function deleteAdminReward(rewardId) {
+  return apiRequest(`/admin/rewards/${rewardId}`, {
+    method: 'DELETE',
+  });
+}

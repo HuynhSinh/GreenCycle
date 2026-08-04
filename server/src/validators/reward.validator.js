@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const rewardTypes = ["DIGITAL_VOUCHER", "PHYSICAL_PRODUCT"];
+const rewardTypes = ["PHYSICAL_PRODUCT"];
 
 const optionalText = (max = 500) => z.string().trim().max(max).optional().default("");
 
@@ -51,5 +51,11 @@ export const updateRewardInventorySchema = z.object({
   body: z.object({
     stockQuantity: z.coerce.number().int().min(0).optional(),
     isUnlimited: z.boolean().optional(),
+  }),
+});
+
+export const deleteRewardSchema = z.object({
+  params: z.object({
+    rewardId: z.string().trim().min(1),
   }),
 });

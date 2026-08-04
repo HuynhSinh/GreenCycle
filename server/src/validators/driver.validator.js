@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const driverStatuses = ["ALL", "ACTIVE", "INACTIVE", "PENDING_PROFILE"];
+const driverStatuses = ["ALL", "ACTIVE", "INACTIVE", "PENDING_APPROVAL", "PENDING_PROFILE"];
 
 export const listDriversSchema = z.object({
   query: z.object({

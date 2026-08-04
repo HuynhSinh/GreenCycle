@@ -119,3 +119,21 @@ export const updateRewardInventory = async (rewardId, payload) => {
   const updatedReward = await rewardRepository.findRewardById(rewardId);
   return mapReward(updatedReward);
 };
+
+export const deleteReward = async (rewardId) => {
+  const existingReward = await rewardRepository.findRewardById(rewardId);
+
+  if (!existingReward) {
+    throw new AppError("Reward not found", 404);
+  }
+
+  const exchangeCount = await rewardRepository.countRewardExchanges(rewardId);
+
+  if (exchangeCount > 0) {
+    throw new AppError("This reward has redemption history and cannot be deleted", 409);
+  }
+
+  await rewardRepository.deleteReward(rewardId);
+
+  return { message: "Reward item deleted successfully." };
+};

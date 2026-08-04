@@ -12,6 +12,7 @@ import {
   Menu,
   PackageCheck,
   Plus,
+  RefreshCw,
   Search,
   Truck,
   Users,
@@ -25,13 +26,20 @@ import {
   getCollectionSchedule,
   rejectCollectionSchedule,
 } from '../api/collectionSchedules';
+import { friendlyError, successText } from '../../../lib/messages';
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 
 const statusStyles = {
-  PENDING: 'bg-amber-100 text-amber-800',
-  VERIFYING: 'bg-sky-100 text-sky-800',
-  APPROVED: 'bg-emerald-100 text-emerald-800',
-  ASSIGNED: 'bg-indigo-100 text-indigo-800',
-  REJECTED: 'bg-rose-100 text-rose-800',
+  PENDING: 'border border-amber-300 bg-amber-50 text-amber-900',
+  APPROVED: 'border border-teal-300 bg-teal-50 text-teal-800',
+  ASSIGNED: 'border border-indigo-300 bg-indigo-50 text-indigo-800',
+  COLLECTING: 'border border-blue-300 bg-blue-50 text-blue-800',
+  ARRIVED: 'border border-violet-300 bg-violet-50 text-violet-800',
+  COLLECTED: 'border border-emerald-300 bg-emerald-50 text-emerald-800',
+  CANCELLED: 'border border-slate-300 bg-slate-100 text-slate-700',
+  REJECTED: 'border border-rose-300 bg-rose-50 text-rose-800',
+  FAILED: 'border border-red-300 bg-red-50 text-red-800',
+  RESCHEDULED: 'border border-orange-300 bg-orange-50 text-orange-800',
 };
 
 const PAGE_SIZE = 5;
@@ -114,14 +122,12 @@ export default function CollectionScheduleManagement() {
         timeConflicts: 0,
       });
 
-      setSelectedRequestId((current) =>
-        nextRequests.some((request) => request.id === current) ? current : nextRequests[0]?.id || '',
-      );
+      setSelectedRequestId((current) => (nextRequests.some((request) => request.id === current) ? current : ''));
       setSelectedDriverId((current) =>
         nextDrivers.some((driver) => driver.id === current) ? current : nextDrivers.find((driver) => driver.active)?.id || '',
       );
     } catch (error) {
-      setScheduleError(error.message || 'Could not load schedule data.');
+      setScheduleError(friendlyError(error, 'Unable to load pickup requests. Please try again.'));
       setPickupRequests([]);
       setDrivers([]);
       setMetricsData({
@@ -182,10 +188,10 @@ export default function CollectionScheduleManagement() {
 
     try {
       const result = await approveCollectionSchedule(selectedRequest.id);
-      setActionMessage(result.message || 'Pickup request approved.');
+      setActionMessage(successText(result.message, 'Pickup request approved. You can now assign a driver.'));
       await loadSchedule();
     } catch (error) {
-      setActionError(error.message || 'Could not approve pickup request.');
+      setActionError(friendlyError(error, 'Unable to approve this request. Please try again.'));
     } finally {
       setActionLoading(false);
     }
@@ -204,10 +210,10 @@ export default function CollectionScheduleManagement() {
         driverId: selectedDriver.id,
       });
 
-      setActionMessage(result.message || 'Pickup scheduled and assigned.');
+      setActionMessage(successText(result.message, 'Driver assigned to the pickup request.'));
       await loadSchedule();
     } catch (error) {
-      setActionError(error.message || 'Could not assign driver.');
+      setActionError(friendlyError(error, 'Unable to assign this driver. Please check capacity and schedule conflicts.'));
     } finally {
       setActionLoading(false);
     }
@@ -224,17 +230,17 @@ export default function CollectionScheduleManagement() {
       const result = await rejectCollectionSchedule(selectedRequest.id, rejectReason);
       setRejectReason('');
       setRejectModalOpen(false);
-      setActionMessage(result.message || 'Pickup request rejected.');
+      setActionMessage(successText(result.message, 'Pickup request rejected.'));
       await loadSchedule();
     } catch (error) {
-      setActionError(error.message || 'Could not reject pickup request.');
+      setActionError(friendlyError(error, 'Unable to reject this request. Please try again.'));
     } finally {
       setActionLoading(false);
     }
   };
 
-  const canApprove = selectedRequest && ['PENDING', 'VERIFYING'].includes(selectedRequest.status);
-  const canReject = selectedRequest && ['PENDING', 'VERIFYING', 'APPROVED'].includes(selectedRequest.status);
+  const canApprove = selectedRequest && selectedRequest.status === 'PENDING';
+  const canReject = selectedRequest && ['PENDING', 'APPROVED'].includes(selectedRequest.status);
   const canAssign = selectedRequest && selectedDriver?.active && selectedRequest.status === 'APPROVED';
   const showAssignmentControls = selectedRequest?.status === 'APPROVED';
 
@@ -263,9 +269,7 @@ export default function CollectionScheduleManagement() {
           />
           <NavItem icon={Users} label="Drivers" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/drivers')} />
           <NavItem icon={CalendarDays} label="Schedules" sidebarOpen={sidebarOpen} active />
-          <NavItem icon={PackageCheck} label="Pickups" sidebarOpen={sidebarOpen} />
           <NavItem icon={Award} label="Rewards" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/rewards')} />
-          <NavItem icon={AlertTriangle} label="Reports" sidebarOpen={sidebarOpen} />
         </nav>
 
         <div className="border-t border-slate-800 p-4">
@@ -293,13 +297,25 @@ export default function CollectionScheduleManagement() {
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Operations</p>
             <h1 className="truncate text-xl font-bold text-slate-900 sm:text-2xl">Collection Schedule Management</h1>
           </div>
-          <button
-            onClick={() => setPanelOpen((open) => !open)}
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 sm:px-4"
-          >
-            {panelOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-            <span className="hidden sm:inline">{panelOpen ? 'Close Panel' : 'Open Panel'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={loadSchedule}
+              disabled={scheduleLoading}
+              className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
+            >
+              <RefreshCw className={`h-4 w-4 ${scheduleLoading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{scheduleLoading ? 'Refreshing...' : 'Refresh'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPanelOpen((open) => !open)}
+              className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 sm:px-4"
+            >
+              {panelOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              <span className="hidden sm:inline">{panelOpen ? 'Close Panel' : 'Open Panel'}</span>
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
@@ -389,10 +405,15 @@ export default function CollectionScheduleManagement() {
                       >
                         <option value="ALL">All statuses</option>
                         <option value="PENDING">Pending</option>
-                        <option value="VERIFYING">Verifying</option>
                         <option value="APPROVED">Approved</option>
                         <option value="ASSIGNED">Assigned</option>
+                        <option value="COLLECTING">Collecting</option>
+                        <option value="ARRIVED">Arrived</option>
+                        <option value="COLLECTED">Collected</option>
+                        <option value="CANCELLED">Cancelled</option>
                         <option value="REJECTED">Rejected</option>
+                        <option value="FAILED">Failed</option>
+                        <option value="RESCHEDULED">Rescheduled</option>
                       </select>
                     </label>
                   </div>
@@ -457,8 +478,8 @@ export default function CollectionScheduleManagement() {
                             </td>
                             <td className="px-5 py-4 text-sm text-slate-700">{driver ? driver.name : 'Unassigned'}</td>
                             <td className="px-5 py-4">
-                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[request.status] || 'bg-slate-100 text-slate-800'}`}>
-                                {request.status}
+                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[request.status] || 'border border-slate-300 bg-slate-100 text-slate-800'}`}>
+                                {formatPickupStatus(request.status)}
                               </span>
                             </td>
                           </tr>
@@ -467,7 +488,7 @@ export default function CollectionScheduleManagement() {
                       {filteredRequests.length === 0 && (
                         <tr>
                           <td colSpan="5" className="px-5 py-10 text-center text-sm font-medium text-slate-500">
-                            {scheduleLoading ? 'Loading schedule data...' : 'No pickup requests match these filters.'}
+                            {scheduleLoading ? 'Loading pickup requests...' : 'No pickup requests match the current filters.'}
                           </td>
                         </tr>
                       )}
@@ -589,14 +610,14 @@ export default function CollectionScheduleManagement() {
                     ))}
                     {drivers.length === 0 && (
                       <div className="rounded-lg border border-slate-200 p-4 text-sm font-medium text-slate-500">
-                        No drivers found for this schedule date.
+                        No available drivers for the selected date.
                       </div>
                     )}
                   </div>
                 </div>
                 ) : (
                   <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">
-                    Approve the request before selecting a driver.
+                    {selectedRequest ? 'Approve the request before selecting a driver.' : 'Select a pickup request to review details and take action.'}
                   </div>
                 )}
 
@@ -622,7 +643,10 @@ export default function CollectionScheduleManagement() {
                     Approve
                   </button>
                   <button
-                    onClick={() => setRejectModalOpen(true)}
+                    onClick={() => {
+                      setRejectReason('');
+                      setRejectModalOpen(true);
+                    }}
                     disabled={!canReject || actionLoading}
                     className="flex items-center justify-center gap-2 rounded-lg border border-rose-600 px-4 py-3 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400"
                   >
@@ -645,61 +669,54 @@ export default function CollectionScheduleManagement() {
         </main>
       </div>
 
-      {rejectModalOpen && selectedRequest && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-bold text-slate-950">Reject pickup request</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  {selectedRequest.displayId} - {selectedRequest.customer}
-                </p>
-              </div>
-              <button
-                onClick={() => setRejectModalOpen(false)}
-                className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
-                aria-label="Close reject confirmation"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <label className="mt-5 block">
-              <span className="text-sm font-semibold text-slate-700">Reject reason</span>
-              <textarea
-                value={rejectReason}
-                onChange={(event) => setRejectReason(event.target.value)}
-                rows={4}
-                className="mt-2 w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
-                placeholder="Optional"
-              />
-            </label>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => setRejectModalOpen(false)}
-                disabled={actionLoading}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleReject}
-                disabled={actionLoading}
-                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-700 disabled:bg-slate-300"
-              >
-                Confirm Reject
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={rejectModalOpen && Boolean(selectedRequest)}
+        tone="danger"
+        title="Reject this pickup request?"
+        description="The customer will not be scheduled for this request after it is rejected."
+        details={selectedRequest ? `${selectedRequest.displayId} - ${selectedRequest.customer}` : ''}
+        confirmLabel="Reject request"
+        cancelLabel="Keep request"
+        loading={actionLoading}
+        onClose={() => {
+          if (!actionLoading) setRejectModalOpen(false);
+        }}
+        onConfirm={handleReject}
+      >
+        <label className="block">
+          <span className="text-sm font-semibold text-slate-700">Reject reason</span>
+          <textarea
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
+            rows={4}
+            className="mt-2 w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
+            placeholder="Optional"
+          />
+        </label>
+      </ConfirmDialog>
     </div>
   );
 }
 
 function TableHead({ children }) {
   return <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-600">{children}</th>;
+}
+
+function formatPickupStatus(status) {
+  const labels = {
+    PENDING: 'Pending',
+    APPROVED: 'Approved',
+    ASSIGNED: 'Assigned',
+    COLLECTING: 'Collecting',
+    ARRIVED: 'Arrived',
+    COLLECTED: 'Collected',
+    CANCELLED: 'Cancelled',
+    REJECTED: 'Rejected',
+    FAILED: 'Failed',
+    RESCHEDULED: 'Rescheduled',
+  };
+
+  return labels[status] || status;
 }
 
 function NavItem({ icon: Icon, label, sidebarOpen, active, onClick }) {

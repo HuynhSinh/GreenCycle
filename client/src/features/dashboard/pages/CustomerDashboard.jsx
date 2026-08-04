@@ -4,16 +4,15 @@ import {
   Award,
   CalendarDays,
   CheckCircle2,
-  Clock,
-  History,
+  Gift,
   LogOut,
-  MapPin,
   Menu,
-  Package,
   Pencil,
   Plus,
+  RefreshCw,
   Scale,
   Truck,
+  Wallet,
   X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -25,6 +24,13 @@ import {
   getPickupBookingData,
   updateCustomerPickup,
 } from '../../customer-pickups/api/customerPickups';
+import {
+  getCustomerRewards,
+  getCustomerWallet,
+  redeemCustomerReward,
+} from '../../rewards/api/customerRewards';
+import { friendlyError, successText } from '../../../lib/messages';
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 
 const initialForm = {
   fullName: '',
@@ -40,17 +46,16 @@ const initialForm = {
 };
 
 const statusStyles = {
-  PENDING: 'bg-amber-100 text-amber-800',
-  VERIFYING: 'bg-sky-100 text-sky-800',
-  APPROVED: 'bg-emerald-100 text-emerald-800',
-  ASSIGNED: 'bg-indigo-100 text-indigo-800',
-  COLLECTING: 'bg-blue-100 text-blue-800',
-  ARRIVED: 'bg-violet-100 text-violet-800',
-  COLLECTED: 'bg-emerald-100 text-emerald-800',
-  CANCELLED: 'bg-slate-100 text-slate-700',
-  REJECTED: 'bg-rose-100 text-rose-800',
-  FAILED: 'bg-rose-100 text-rose-800',
-  RESCHEDULED: 'bg-orange-100 text-orange-800',
+  PENDING: 'border border-amber-300 bg-amber-50 text-amber-900',
+  APPROVED: 'border border-teal-300 bg-teal-50 text-teal-800',
+  ASSIGNED: 'border border-indigo-300 bg-indigo-50 text-indigo-800',
+  COLLECTING: 'border border-blue-300 bg-blue-50 text-blue-800',
+  ARRIVED: 'border border-violet-300 bg-violet-50 text-violet-800',
+  COLLECTED: 'border border-emerald-300 bg-emerald-50 text-emerald-800',
+  CANCELLED: 'border border-slate-300 bg-slate-100 text-slate-700',
+  REJECTED: 'border border-rose-300 bg-rose-50 text-rose-800',
+  FAILED: 'border border-red-300 bg-red-50 text-red-800',
+  RESCHEDULED: 'border border-orange-300 bg-orange-50 text-orange-800',
 };
 
 const pickupTimeSlots = Array.from({ length: 18 }, (_, index) => {
@@ -62,15 +67,22 @@ const pickupTimeSlots = Array.from({ length: 18 }, (_, index) => {
 
 const getLocalDateInputValue = () => {
   const today = new Date();
-  return today.toISOString().slice(0, 10);
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 };
 
 export default function CustomerDashboard() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState('pickups');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
+  const [loadingRewards, setLoadingRewards] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [redeemingId, setRedeemingId] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [bookingOpen, setBookingOpen] = useState(false);
@@ -78,6 +90,9 @@ export default function CustomerDashboard() {
   const [selectedPickup, setSelectedPickup] = useState(null);
   const [categories, setCategories] = useState([]);
   const [pickups, setPickups] = useState([]);
+  const [walletData, setWalletData] = useState(null);
+  const [rewards, setRewards] = useState([]);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [form, setForm] = useState({
     ...initialForm,
     scheduledDate: getLocalDateInputValue(),
@@ -113,7 +128,7 @@ export default function CustomerDashboard() {
         })),
       }));
     } catch (requestError) {
-      setError(requestError.message || 'Could not load pickup booking data.');
+      setError(friendlyError(requestError, 'Unable to load pickup booking data. Please try again.'));
     } finally {
       setLoadingData(false);
     }
@@ -123,8 +138,33 @@ export default function CustomerDashboard() {
     loadData();
   }, [loadData]);
 
+  const loadRewards = useCallback(async () => {
+    setLoadingRewards(true);
+    setError('');
+
+    try {
+      const [walletResponse, rewardsResponse] = await Promise.all([
+        getCustomerWallet(),
+        getCustomerRewards(),
+      ]);
+
+      setWalletData(walletResponse.data || null);
+      setRewards(rewardsResponse.data?.rewards || []);
+    } catch (requestError) {
+      setError(friendlyError(requestError, 'Unable to load your Eco-point wallet. Please try again.'));
+    } finally {
+      setLoadingRewards(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'rewards') {
+      loadRewards();
+    }
+  }, [activeTab, loadRewards]);
+
   const metrics = useMemo(() => {
-    const activeCount = pickups.filter((pickup) => ['PENDING', 'VERIFYING', 'APPROVED', 'ASSIGNED', 'COLLECTING', 'ARRIVED'].includes(pickup.status)).length;
+    const activeCount = pickups.filter((pickup) => ['PENDING', 'APPROVED', 'ASSIGNED', 'COLLECTING', 'ARRIVED'].includes(pickup.status)).length;
     const collectedCount = pickups.filter((pickup) => pickup.status === 'COLLECTED').length;
     const totalPoints = pickups.reduce((total, pickup) => total + (pickup.totalPoints || 0), 0);
 
@@ -134,6 +174,23 @@ export default function CustomerDashboard() {
       { label: 'Estimated points', value: totalPoints, icon: Award, tone: 'bg-amber-50 text-amber-600' },
     ];
   }, [pickups]);
+
+  const walletMetrics = useMemo(() => {
+    const transactions = walletData?.wallet?.transactions || [];
+    const earned = transactions
+      .filter((transaction) => transaction.amount > 0)
+      .reduce((total, transaction) => total + transaction.amount, 0);
+    const redeemed = transactions
+      .filter((transaction) => transaction.amount < 0)
+      .reduce((total, transaction) => total + Math.abs(transaction.amount), 0);
+
+    return [
+      { label: 'Eco-point balance', value: walletData?.wallet?.balance || 0, icon: Wallet, tone: 'bg-emerald-50 text-emerald-600' },
+      { label: 'Lifetime points', value: walletData?.passport?.totalPoints || 0, icon: Award, tone: 'bg-amber-50 text-amber-600' },
+      { label: 'Redeemed points', value: redeemed, icon: Gift, tone: 'bg-rose-50 text-rose-600' },
+      { label: 'Earned in history', value: earned, icon: CheckCircle2, tone: 'bg-sky-50 text-sky-600' },
+    ];
+  }, [walletData]);
 
   const totalWeight = form.items.reduce((total, item) => total + Number(item.weight || 0), 0);
   const estimatedPoints = form.items.reduce((total, item) => {
@@ -216,23 +273,70 @@ export default function CustomerDashboard() {
     setError('');
   };
 
-  const handleCancelPickup = async (pickup) => {
-    if (!window.confirm('Cancel this pending pickup request?')) return;
-
+  const executeCancelPickup = async (pickup) => {
     setSaving(true);
     setMessage('');
     setError('');
 
     try {
       const result = await cancelCustomerPickup(pickup.id);
-      setMessage(result.message || 'Pickup request cancelled successfully.');
+      setMessage(successText(result.message, 'Pickup request cancelled. The list has been refreshed.'));
       setSelectedPickup(result.data);
+      setConfirmDialog(null);
       await loadData();
     } catch (requestError) {
-      setError(requestError.message || 'Could not cancel pickup request.');
+      setError(friendlyError(requestError, 'Unable to cancel this request. Please try again.'));
+      setConfirmDialog(null);
     } finally {
       setSaving(false);
     }
+  };
+
+  const executeRedeemReward = async (reward) => {
+    setRedeemingId(reward.id);
+    setMessage('');
+    setError('');
+
+    try {
+      const result = await redeemCustomerReward(reward.id);
+      setMessage(successText(result.message, 'Reward redemption request created. Points have been deducted from your wallet.'));
+      setConfirmDialog(null);
+      await loadRewards();
+    } catch (requestError) {
+      setError(friendlyError(requestError, 'Unable to redeem this reward. Please try again.'));
+      setConfirmDialog(null);
+    } finally {
+      setRedeemingId('');
+    }
+  };
+
+  const handleCancelPickup = (pickup) => {
+    setConfirmDialog({
+      type: 'cancelPickup',
+      pickup,
+    });
+  };
+
+  const handleRedeemReward = (reward) => {
+    setConfirmDialog({
+      type: 'redeemReward',
+      reward,
+    });
+  };
+
+  const handleConfirmAction = async () => {
+    if (confirmDialog?.type === 'cancelPickup') {
+      await executeCancelPickup(confirmDialog.pickup);
+    }
+
+    if (confirmDialog?.type === 'redeemReward') {
+      await executeRedeemReward(confirmDialog.reward);
+    }
+  };
+
+  const closeConfirmDialog = () => {
+    if (saving || redeemingId) return;
+    setConfirmDialog(null);
   };
 
   const updateItem = (index, field, value) => {
@@ -266,7 +370,7 @@ export default function CustomerDashboard() {
       const pickupHour = Number(form.scheduledTime.split(':')[0]);
 
       if (pickupHour < 8 || pickupHour >= 17) {
-        setError('Please choose a pickup time between 08:00 and 17:00.');
+        setError('Please choose a pickup time from 08:00 to before 17:00.');
         setSaving(false);
         return;
       }
@@ -293,13 +397,13 @@ export default function CustomerDashboard() {
         ? await updateCustomerPickup(editingPickupId, payload)
         : await createCustomerPickup(payload);
 
-      setMessage(`${result.message || 'Pickup request saved successfully.'} The pickup list has been refreshed.`);
+      setMessage(successText(result.message, 'Pickup request saved. The list has been refreshed.'));
       setSelectedPickup(result.data);
       resetBookingForm();
       await loadData();
       setBookingOpen(false);
     } catch (requestError) {
-      setError(requestError.message || 'Could not submit pickup request.');
+      setError(friendlyError(requestError, 'Unable to save this pickup request. Please check the information and try again.'));
     } finally {
       setSaving(false);
     }
@@ -316,9 +420,8 @@ export default function CustomerDashboard() {
         </div>
 
         <nav className="flex-1 space-y-2 p-4">
-          <NavItem icon={CalendarDays} label="Schedule Pickup" sidebarOpen={sidebarOpen} active />
-          <NavItem icon={History} label="History" sidebarOpen={sidebarOpen} />
-          <NavItem icon={Award} label="Rewards" sidebarOpen={sidebarOpen} />
+          <NavItem icon={CalendarDays} label="Pickups" sidebarOpen={sidebarOpen} active={activeTab === 'pickups'} onClick={() => setActiveTab('pickups')} />
+          <NavItem icon={Award} label="Rewards" sidebarOpen={sidebarOpen} active={activeTab === 'rewards'} onClick={() => setActiveTab('rewards')} />
         </nav>
 
         <div className="border-t border-emerald-600 p-4">
@@ -344,23 +447,48 @@ export default function CustomerDashboard() {
           </button>
           <div className="min-w-0 px-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Customer Portal</p>
-            <h1 className="truncate text-xl font-bold text-slate-900 sm:text-2xl">Schedule Pickup</h1>
+            <h1 className="truncate text-xl font-bold text-slate-900 sm:text-2xl">
+              {activeTab === 'rewards' ? 'Eco Wallet & Rewards' : 'My Pickups'}
+            </h1>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              if (bookingOpen) {
-                resetBookingForm();
-                setBookingOpen(false);
-              } else {
-                setBookingOpen(true);
-              }
-            }}
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 sm:px-4"
-          >
-            {bookingOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-            <span className="hidden sm:inline">{bookingOpen ? 'Close Form' : 'New Pickup'}</span>
-          </button>
+          {activeTab === 'pickups' ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={loadData}
+                disabled={loadingData}
+                className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
+              >
+                <RefreshCw className={`h-4 w-4 ${loadingData ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{loadingData ? 'Refreshing...' : 'Refresh'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (bookingOpen) {
+                    resetBookingForm();
+                    setBookingOpen(false);
+                  } else {
+                    setBookingOpen(true);
+                  }
+                }}
+                className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 sm:px-4"
+              >
+                {bookingOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                <span className="hidden sm:inline">{bookingOpen ? 'Close Form' : 'New Pickup'}</span>
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={loadRewards}
+              disabled={loadingRewards}
+              className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:px-4"
+            >
+              <Wallet className="h-4 w-4" />
+              <span className="hidden sm:inline">{loadingRewards ? 'Loading...' : 'Refresh'}</span>
+            </button>
+          )}
         </header>
 
         <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
@@ -377,6 +505,8 @@ export default function CustomerDashboard() {
             </div>
           )}
 
+          {activeTab === 'pickups' ? (
+          <>
           <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
             {metrics.map((metric) => {
               const Icon = metric.icon;
@@ -505,7 +635,7 @@ export default function CustomerDashboard() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900">My Pickups</h2>
-                    <p className="mt-1 text-sm text-slate-600">Track requests submitted from this account.</p>
+                <p className="mt-1 text-sm text-slate-600">Track the pickup requests submitted from your account.</p>
                   </div>
                 </div>
               </div>
@@ -517,8 +647,8 @@ export default function CustomerDashboard() {
                         <p className="font-semibold text-slate-950">{formatDateTime(pickup.scheduledTime)}</p>
                         <p className="mt-1 text-sm text-slate-600">{pickup.address?.ward}, {pickup.address?.district}</p>
                       </div>
-                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[pickup.status] || 'bg-slate-100 text-slate-700'}`}>
-                        {pickup.status}
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[pickup.status] || 'border border-slate-300 bg-slate-100 text-slate-700'}`}>
+                        {formatPickupStatus(pickup.status)}
                       </span>
                     </div>
                     <p className="mt-3 text-sm font-medium text-slate-700">
@@ -562,7 +692,7 @@ export default function CustomerDashboard() {
                 ))}
                 {pickups.length === 0 && (
                   <div className={bookingOpen ? 'px-5 py-10 text-center text-sm font-medium text-slate-500' : 'rounded-lg border border-dashed border-slate-300 px-5 py-10 text-center text-sm font-medium text-slate-500 lg:col-span-2'}>
-                    {loadingData ? 'Loading pickups...' : 'No pickup requests yet.'}
+                    {loadingData ? 'Loading pickup requests...' : 'You do not have any pickup requests yet.'}
                   </div>
                 )}
               </div>
@@ -588,7 +718,7 @@ export default function CustomerDashboard() {
                 </div>
 
                 <div className="mt-5 space-y-3">
-                  <Detail label="Status" value={selectedPickup.status} />
+                  <Detail label="Status" value={formatPickupStatus(selectedPickup.status)} />
                   <Detail label="Address" value={`${selectedPickup.address?.addressLine || ''}, ${selectedPickup.address?.ward || ''}, ${selectedPickup.address?.district || ''}`} />
                   <Detail label="Total weight" value={`${selectedPickup.totalWeight} kg`} />
                   <Detail label="Estimated points" value={selectedPickup.totalPoints} />
@@ -620,8 +750,42 @@ export default function CustomerDashboard() {
               </div>
             </div>
           )}
+          </>
+          ) : (
+            <RewardsView
+              loading={loadingRewards}
+              walletData={walletData}
+              walletMetrics={walletMetrics}
+              rewards={rewards}
+              redeemingId={redeemingId}
+              onRedeem={handleRedeemReward}
+            />
+          )}
         </main>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(confirmDialog)}
+        tone={confirmDialog?.type === 'redeemReward' ? 'reward' : 'danger'}
+        title={confirmDialog?.type === 'redeemReward' ? 'Redeem this reward?' : 'Cancel pickup request?'}
+        description={
+          confirmDialog?.type === 'redeemReward'
+            ? 'This will create a redemption request and deduct Eco-points from your wallet.'
+            : 'This pickup will be cancelled and will no longer be scheduled by admin.'
+        }
+        details={
+          confirmDialog?.type === 'redeemReward'
+            ? `${confirmDialog.reward.name} - ${confirmDialog.reward.pointCost} Eco-points`
+            : confirmDialog?.pickup
+              ? `${formatDateTime(confirmDialog.pickup.scheduledTime)} - ${confirmDialog.pickup.address?.ward || 'Unspecified ward'}`
+              : ''
+        }
+        confirmLabel={confirmDialog?.type === 'redeemReward' ? 'Redeem reward' : 'Cancel pickup'}
+        cancelLabel="Keep it"
+        loading={saving || Boolean(redeemingId)}
+        onClose={closeConfirmDialog}
+        onConfirm={handleConfirmAction}
+      />
     </div>
   );
 }
@@ -633,6 +797,23 @@ function formatDateTime(value) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
+}
+
+function formatPickupStatus(status) {
+  const labels = {
+    PENDING: 'Pending',
+    APPROVED: 'Approved',
+    ASSIGNED: 'Assigned',
+    COLLECTING: 'Collecting',
+    ARRIVED: 'Arrived',
+    COLLECTED: 'Collected',
+    CANCELLED: 'Cancelled',
+    REJECTED: 'Rejected',
+    FAILED: 'Failed',
+    RESCHEDULED: 'Rescheduled',
+  };
+
+  return labels[status] || status;
 }
 
 function Field({ label, children, required = false, hint = '' }) {
@@ -673,10 +854,149 @@ function Detail({ label, value }) {
   );
 }
 
-function NavItem({ icon: Icon, label, sidebarOpen, active }) {
+function RewardsView({ loading, walletData, walletMetrics, rewards, redeemingId, onRedeem }) {
+  const transactions = walletData?.wallet?.transactions || [];
+  const exchanges = walletData?.exchanges || [];
+  const balance = walletData?.wallet?.balance || 0;
+
+  return (
+    <div className="space-y-6">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {walletMetrics.map((metric) => {
+          const Icon = metric.icon;
+          return (
+            <div key={metric.label} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">{metric.label}</p>
+                  <p className="mt-2 text-2xl font-bold text-slate-950">{metric.value}</p>
+                </div>
+                <div className={`rounded-lg p-3 ${metric.tone}`}>
+                  <Icon className="h-6 w-6" />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
+      <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-900">
+        Eco-points are added to your wallet only after a driver marks a pickup as collected and enters the actual kilograms.
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 p-5">
+            <h2 className="text-lg font-bold text-slate-900">Redeem Rewards</h2>
+            <p className="mt-1 text-sm text-slate-600">Choose an available physical reward and redeem it with your Eco-point balance.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
+            {rewards.map((reward) => {
+              const disabled = !reward.canRedeem || redeemingId === reward.id;
+              return (
+                <article key={reward.id} className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                  {reward.imageUrl ? (
+                    <img src={reward.imageUrl} alt={reward.name} className="h-36 w-full object-cover" />
+                  ) : (
+                    <div className="flex h-36 items-center justify-center bg-emerald-100 text-emerald-700">
+                      <Gift className="h-10 w-10" />
+                    </div>
+                  )}
+                  <div className="space-y-3 p-4">
+                    <div>
+                      <p className="text-base font-bold text-slate-950">{reward.name}</p>
+                      {reward.partnerName && <p className="mt-1 text-xs font-semibold uppercase text-emerald-700">{reward.partnerName}</p>}
+                      {reward.description && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{reward.description}</p>}
+                    </div>
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="font-bold text-amber-700">{reward.pointCost} pts</span>
+                      <span className="font-medium text-slate-500">
+                        {reward.inventory.isUnlimited ? 'Unlimited' : `${reward.inventory.stockQuantity} left`}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onRedeem(reward)}
+                      disabled={disabled}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      <Gift className="h-4 w-4" />
+                      {redeemingId === reward.id ? 'Redeeming...' : balance < reward.pointCost ? 'Not enough points' : 'Redeem'}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+            {rewards.length === 0 && (
+              <div className="rounded-lg border border-dashed border-slate-300 px-5 py-10 text-center text-sm font-medium text-slate-500 md:col-span-2">
+                {loading ? 'Loading rewards...' : 'No rewards are available right now.'}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 p-5">
+              <h2 className="text-lg font-bold text-slate-900">Point History</h2>
+            </div>
+            <div className="divide-y divide-slate-200">
+              {transactions.map((transaction) => (
+                <div key={transaction.id} className="flex items-start justify-between gap-3 p-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{transaction.description || transaction.type}</p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">{formatDateTime(transaction.createdAt)}</p>
+                  </div>
+                  <span className={`text-sm font-bold ${transaction.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    {transaction.amount >= 0 ? '+' : ''}{transaction.amount}
+                  </span>
+                </div>
+              ))}
+              {transactions.length === 0 && (
+                <div className="px-5 py-10 text-center text-sm font-medium text-slate-500">
+                  {loading ? 'Loading point history...' : 'No point transactions yet. Points will be added after a successful collection.'}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 p-5">
+              <h2 className="text-lg font-bold text-slate-900">Reward Exchanges</h2>
+            </div>
+            <div className="divide-y divide-slate-200">
+              {exchanges.map((exchange) => (
+                <div key={exchange.id} className="space-y-2 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-semibold text-slate-900">{exchange.rewardName}</p>
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">{exchange.status}</span>
+                  </div>
+                  <p className="text-xs font-medium text-slate-500">{formatDateTime(exchange.createdAt)}</p>
+                  {exchange.voucherCode && (
+                    <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-900">
+                      Code: {exchange.voucherCode}
+                    </p>
+                  )}
+                </div>
+              ))}
+              {exchanges.length === 0 && (
+                <div className="px-5 py-10 text-center text-sm font-medium text-slate-500">
+                  {loading ? 'Loading redemption history...' : 'You have not redeemed any rewards yet.'}
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function NavItem({ icon: Icon, label, sidebarOpen, active, onClick }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 transition-colors ${
         active ? 'bg-white/20 text-white' : 'text-emerald-100 hover:bg-white/10'
       }`}

@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   Package,
+  RefreshCw,
   Save,
   ShieldCheck,
   Truck,
@@ -18,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { logout } from '../../auth/api/auth';
 import { getDriverAssignments, updateDriverAssignmentStatus } from '../../driver-assignments/api/driverAssignments';
 import { getDriverProfile, updateDriverProfile } from '../../drivers/api/drivers';
+import { friendlyError } from '../../../lib/messages';
 
 const emptyProfile = {
   fullName: '',
@@ -31,17 +33,22 @@ const emptyProfile = {
 const statusMeta = {
   ACTIVE: {
     label: 'Approved',
-    tone: 'bg-emerald-100 text-emerald-800',
+    tone: 'border border-emerald-300 bg-emerald-50 text-emerald-800',
     icon: CheckCircle2,
   },
   INACTIVE: {
-    label: 'Waiting approval',
-    tone: 'bg-amber-100 text-amber-800',
+    label: 'Inactive',
+    tone: 'border border-slate-300 bg-slate-100 text-slate-700',
+    icon: AlertTriangle,
+  },
+  PENDING_APPROVAL: {
+    label: 'Pending approval',
+    tone: 'border border-amber-300 bg-amber-50 text-amber-900',
     icon: Clock,
   },
   PENDING_PROFILE: {
     label: 'Profile required',
-    tone: 'bg-rose-100 text-rose-800',
+    tone: 'border border-rose-300 bg-rose-50 text-rose-800',
     icon: AlertTriangle,
   },
 };
@@ -88,7 +95,7 @@ export default function DriverDashboard() {
         email: data.email || '',
       });
     } catch (requestError) {
-      setError(requestError.message || 'Could not load driver profile.');
+      setError(friendlyError(requestError, 'Unable to load the driver profile. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -109,7 +116,7 @@ export default function DriverDashboard() {
         nextAssignments.some((assignment) => assignment.id === current) ? current : nextAssignments[0]?.id || '',
       );
     } catch (requestError) {
-      setAssignmentError(requestError.message || 'Could not load assignments.');
+      setAssignmentError(friendlyError(requestError, 'Unable to load assigned tasks. Please try again.'));
       setAssignments([]);
       setActiveAssignmentId(null);
     } finally {
@@ -229,11 +236,16 @@ export default function DriverDashboard() {
           : { status: nextStatus };
       const result = await updateDriverAssignmentStatus(selectedAssignment.id, payload);
 
-      setAssignmentMessage(result.message || 'Assignment updated.');
+      const nextMessages = {
+        COLLECTING: 'Pickup started. Please work on one assignment at a time.',
+        ARRIVED: 'Arrival at the pickup location has been recorded.',
+        COLLECTED: 'Pickup marked as collected. Evidence photo and actual weights were saved.',
+      };
+      setAssignmentMessage(nextMessages[nextStatus] || 'Assignment updated.');
       await loadAssignments();
       resetCollectionForm(result.data);
     } catch (requestError) {
-      setAssignmentError(requestError.message || 'Could not update assignment.');
+      setAssignmentError(friendlyError(requestError, 'Unable to update this assignment. Please check the information and try again.'));
     } finally {
       setAssignmentLoading(false);
     }
@@ -260,8 +272,8 @@ export default function DriverDashboard() {
       setProfile(response.data);
       setMessage(
         wasApproved
-          ? 'Profile updated successfully.'
-          : response.message || 'Profile submitted and waiting for admin approval.',
+          ? 'Profile updated and sent for admin approval. Assignments are paused until approval.'
+          : response.message || 'Profile submitted. Please wait for admin approval before receiving assignments.',
       );
       setForm({
         fullName: response.data.driver?.fullName || '',
@@ -272,7 +284,7 @@ export default function DriverDashboard() {
         email: response.data.email || '',
       });
     } catch (requestError) {
-      setError(requestError.message || 'Could not submit driver profile.');
+      setError(friendlyError(requestError, 'Unable to save the driver profile. Please check the information and try again.'));
     } finally {
       setSaving(false);
     }
@@ -297,7 +309,6 @@ export default function DriverDashboard() {
         <nav className="flex-1 space-y-2 p-4">
           <NavItem icon={User} label="Profile" sidebarOpen={sidebarOpen} active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
           <NavItem icon={Truck} label="Assignments" sidebarOpen={sidebarOpen} active={activeTab === 'assignments'} disabled={!active} onClick={() => setActiveTab('assignments')} />
-          <NavItem icon={ClipboardCheck} label="History" sidebarOpen={sidebarOpen} disabled={!active} />
         </nav>
 
         <div className="border-t border-slate-800 p-4">
@@ -354,9 +365,20 @@ export default function DriverDashboard() {
 
                 <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
                   <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-200 p-5">
-                      <h2 className="text-lg font-bold text-slate-900">Assigned Pickups</h2>
-                      <p className="mt-1 text-sm text-slate-600">Work on one pickup at a time and submit evidence when collection is complete.</p>
+                    <div className="flex flex-col gap-4 border-b border-slate-200 p-5 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h2 className="text-lg font-bold text-slate-900">Assigned Pickups</h2>
+                        <p className="mt-1 text-sm text-slate-600">Work on one pickup at a time and submit evidence when collection is complete.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={loadAssignments}
+                        disabled={assignmentLoading}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${assignmentLoading ? 'animate-spin' : ''}`} />
+                        {assignmentLoading ? 'Refreshing...' : 'Refresh'}
+                      </button>
                     </div>
                     <div className="divide-y divide-slate-200">
                       {assignments.map((assignment) => {
@@ -383,7 +405,7 @@ export default function DriverDashboard() {
                       })}
                       {assignments.length === 0 && (
                         <div className="px-5 py-10 text-center text-sm font-medium text-slate-500">
-                          {assignmentLoading ? 'Loading assignments...' : 'No assigned pickups.'}
+                          {assignmentLoading ? 'Loading assignments...' : 'No assignments have been assigned yet.'}
                         </div>
                       )}
                     </div>
@@ -654,11 +676,11 @@ function Info({ label, value }) {
 }
 
 const taskStatusStyles = {
-  ASSIGNED: 'bg-indigo-100 text-indigo-800',
-  COLLECTING: 'bg-sky-100 text-sky-800',
-  ARRIVED: 'bg-amber-100 text-amber-800',
-  COLLECTED: 'bg-emerald-100 text-emerald-800',
-  FAILED: 'bg-rose-100 text-rose-800',
+  ASSIGNED: 'border border-indigo-300 bg-indigo-50 text-indigo-800',
+  COLLECTING: 'border border-blue-300 bg-blue-50 text-blue-800',
+  ARRIVED: 'border border-violet-300 bg-violet-50 text-violet-800',
+  COLLECTED: 'border border-emerald-300 bg-emerald-50 text-emerald-800',
+  FAILED: 'border border-red-300 bg-red-50 text-red-800',
 };
 
 function NavItem({ icon: Icon, label, sidebarOpen, active, disabled, onClick }) {

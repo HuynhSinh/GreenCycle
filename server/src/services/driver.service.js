@@ -5,6 +5,7 @@ import * as driverRepository from "../repositories/driver.repository.js";
 
 const getDriverStatus = (account) => {
   if (!account.driver) return "PENDING_PROFILE";
+  if (account.driver.approvalStatus) return account.driver.approvalStatus;
   return account.driver.isActive ? "ACTIVE" : "INACTIVE";
 };
 
@@ -31,6 +32,7 @@ const mapDriverAccount = (account) => {
           vehicleInfo: account.driver.vehicleInfo || "",
           licensePlate: account.driver.licensePlate || "",
           maxCapacityKg: account.driver.maxCapacityKg,
+          approvalStatus: account.driver.approvalStatus,
           isActive: account.driver.isActive,
           currentLat: account.driver.currentLat,
           currentLng: account.driver.currentLng,
@@ -57,6 +59,7 @@ export const listDrivers = async ({ q, status, page = 1, limit = 20 }) => {
       activeDrivers: drivers.filter((driver) => driver.status === "ACTIVE").length,
       inactiveDrivers: drivers.filter((driver) => driver.status === "INACTIVE").length,
       pendingProfiles: drivers.filter((driver) => driver.status === "PENDING_PROFILE").length,
+      pendingApproval: drivers.filter((driver) => driver.status === "PENDING_APPROVAL").length,
     },
     pagination: {
       page,
@@ -122,6 +125,7 @@ export const createDriverAccount = async (payload) => {
       vehicleInfo: payload.vehicleInfo || null,
       licensePlate: payload.licensePlate || null,
       maxCapacityKg: payload.maxCapacityKg || 0,
+      approvalStatus: "PENDING_APPROVAL",
       isActive: false,
     };
   }
@@ -140,7 +144,7 @@ export const createDriverAccount = async (payload) => {
   return mapDriverAccount(account);
 };
 
-const updateDriverStatus = async ({ accountId, isActive }) => {
+const updateDriverStatus = async ({ accountId, isActive, approvalStatus }) => {
   const account = await driverRepository.findDriverAccountById(accountId);
 
   if (!account) {
@@ -154,16 +158,20 @@ const updateDriverStatus = async ({ accountId, isActive }) => {
   await driverRepository.updateDriverActiveStatus({
     idDriver: account.driver.idDriver,
     isActive,
+    approvalStatus,
   });
 
   return getDriver(accountId);
 };
 
-export const approveDriver = (accountId) => updateDriverStatus({ accountId, isActive: true });
+export const approveDriver = (accountId) =>
+  updateDriverStatus({ accountId, isActive: true, approvalStatus: "ACTIVE" });
 
-export const enableDriver = (accountId) => updateDriverStatus({ accountId, isActive: true });
+export const enableDriver = (accountId) =>
+  updateDriverStatus({ accountId, isActive: true, approvalStatus: "ACTIVE" });
 
-export const disableDriver = (accountId) => updateDriverStatus({ accountId, isActive: false });
+export const disableDriver = (accountId) =>
+  updateDriverStatus({ accountId, isActive: false, approvalStatus: "INACTIVE" });
 
 export const updateOwnDriverProfile = async (accountId, payload) => {
   const account = await driverRepository.findDriverAccountByAccountId(accountId);

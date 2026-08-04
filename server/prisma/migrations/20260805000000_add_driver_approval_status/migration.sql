@@ -1,0 +1,8 @@
+ALTER TABLE "Driver"
+ADD COLUMN "approvalStatus" TEXT NOT NULL DEFAULT 'PENDING_APPROVAL';
+
+UPDATE "Driver"
+SET "approvalStatus" = CASE
+  WHEN "isActive" = TRUE THEN 'ACTIVE'
+  ELSE 'INACTIVE'
+END;

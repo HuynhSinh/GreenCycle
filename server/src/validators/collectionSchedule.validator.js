@@ -2,7 +2,6 @@ import { z } from "zod";
 
 const pickupStatuses = [
   "PENDING",
-  "VERIFYING",
   "APPROVED",
   "ASSIGNED",
   "COLLECTING",
