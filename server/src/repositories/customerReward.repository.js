@@ -12,6 +12,21 @@ const rewardInclude = {
 
 const redemptionConflict = (code) => Object.assign(new Error(code), { code });
 
+const exchangeInclude = {
+  reward: true,
+};
+
+const findWalletByCustomer = (tx, idCustomer) =>
+  tx.ecoWallet.findUnique({
+    where: { idCustomer },
+    include: {
+      transactions: {
+        orderBy: { createdAt: "desc" },
+        take: 30,
+      },
+    },
+  });
+
 export const findCustomerByAccountId = (idAccount) =>
   prisma.customer.findUnique({
     where: { idAccount },
@@ -61,8 +76,39 @@ export const findAvailableRewards = () =>
     include: rewardInclude,
   });
 
-export const redeemReward = ({ idCustomer, rewardId }) =>
+export const findExchangeByIdempotencyKey = (idempotencyKey) =>
+  prisma.rewardExchange.findUnique({
+    where: { idempotencyKey },
+    include: exchangeInclude,
+  });
+
+export const findWalletByCustomerId = (idCustomer) =>
+  prisma.ecoWallet.findUnique({
+    where: { idCustomer },
+    include: {
+      transactions: {
+        orderBy: { createdAt: "desc" },
+        take: 30,
+      },
+    },
+  });
+
+export const redeemReward = ({ idCustomer, rewardId, idempotencyKey }) =>
   prisma.$transaction(async (tx) => {
+    const existingExchange = await tx.rewardExchange.findUnique({
+      where: { idempotencyKey },
+      include: exchangeInclude,
+    });
+
+    if (existingExchange) {
+      if (existingExchange.idCustomer !== idCustomer || existingExchange.idReward !== rewardId) {
+        return { error: "IDEMPOTENCY_KEY_CONFLICT" };
+      }
+
+      const wallet = await findWalletByCustomer(tx, idCustomer);
+      return { exchange: existingExchange, wallet, idempotent: true };
+    }
+
     const reward = await tx.reward.findUnique({
       where: { idReward: rewardId },
       include: rewardInclude,
@@ -169,23 +215,14 @@ export const redeemReward = ({ idCustomer, rewardId }) =>
       data: {
         idCustomer,
         idReward: reward.idReward,
-        status: "PENDING",
+        status: "SUCCESS",
         voucherCodeUsed,
+        idempotencyKey,
       },
-      include: {
-        reward: true,
-      },
+      include: exchangeInclude,
     });
 
-    const updatedWallet = await tx.ecoWallet.findUnique({
-      where: { idWallet: wallet.idWallet },
-      include: {
-        transactions: {
-          orderBy: { createdAt: "desc" },
-          take: 30,
-        },
-      },
-    });
+    const updatedWallet = await findWalletByCustomer(tx, idCustomer);
 
     return { exchange, wallet: updatedWallet };
   });

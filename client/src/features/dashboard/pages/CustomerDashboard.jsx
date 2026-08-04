@@ -74,6 +74,12 @@ const getLocalDateInputValue = () => {
   return `${year}-${month}-${day}`;
 };
 
+const createIdempotencyKey = () => {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+
+  return `redeem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
 export default function CustomerDashboard() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -292,14 +298,14 @@ export default function CustomerDashboard() {
     }
   };
 
-  const executeRedeemReward = async (reward) => {
+  const executeRedeemReward = async (reward, idempotencyKey) => {
     setRedeemingId(reward.id);
     setMessage('');
     setError('');
 
     try {
-      const result = await redeemCustomerReward(reward.id);
-      setMessage(successText(result.message, 'Reward redemption request created. Points have been deducted from your wallet.'));
+      const result = await redeemCustomerReward(reward.id, idempotencyKey);
+      setMessage(successText(result.message, 'Reward redeemed successfully. Points have been deducted from your wallet.'));
       setConfirmDialog(null);
       await loadRewards();
     } catch (requestError) {
@@ -321,6 +327,7 @@ export default function CustomerDashboard() {
     setConfirmDialog({
       type: 'redeemReward',
       reward,
+      idempotencyKey: createIdempotencyKey(),
     });
   };
 
@@ -330,7 +337,7 @@ export default function CustomerDashboard() {
     }
 
     if (confirmDialog?.type === 'redeemReward') {
-      await executeRedeemReward(confirmDialog.reward);
+      await executeRedeemReward(confirmDialog.reward, confirmDialog.idempotencyKey);
     }
   };
 
@@ -969,7 +976,9 @@ function RewardsView({ loading, walletData, walletMetrics, rewards, redeemingId,
                 <div key={exchange.id} className="space-y-2 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <p className="text-sm font-semibold text-slate-900">{exchange.rewardName}</p>
-                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">{exchange.status}</span>
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${rewardExchangeStatusClass(exchange.status)}`}>
+                      {formatRewardExchangeStatus(exchange.status)}
+                    </span>
                   </div>
                   <p className="text-xs font-medium text-slate-500">{formatDateTime(exchange.createdAt)}</p>
                   {exchange.voucherCode && (
@@ -990,6 +999,22 @@ function RewardsView({ loading, walletData, walletMetrics, rewards, redeemingId,
       </section>
     </div>
   );
+}
+
+function formatRewardExchangeStatus(status) {
+  const labels = {
+    SUCCESS: 'Redeemed',
+    PENDING: 'Pending',
+    FAILED: 'Failed',
+  };
+
+  return labels[status] || status;
+}
+
+function rewardExchangeStatusClass(status) {
+  if (status === 'SUCCESS') return 'bg-emerald-100 text-emerald-800';
+  if (status === 'FAILED') return 'bg-rose-100 text-rose-800';
+  return 'bg-amber-100 text-amber-800';
 }
 
 function NavItem({ icon: Icon, label, sidebarOpen, active, onClick }) {

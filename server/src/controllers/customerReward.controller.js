@@ -12,9 +12,13 @@ export const listRewards = asyncHandler(async (req, res) => {
 });
 
 export const redeemReward = asyncHandler(async (req, res) => {
-  const result = await customerRewardService.redeemReward(req.user.id, req.validated.params.rewardId);
+  const result = await customerRewardService.redeemReward(
+    req.user.id,
+    req.validated.params.rewardId,
+    req.validated.body.idempotencyKey,
+  );
   res.status(201).json({
-    message: "Reward exchange request created successfully.",
+    message: "Reward redeemed successfully.",
     data: result,
   });
 });

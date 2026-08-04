@@ -44,6 +44,10 @@ const friendlyErrorMap = [
     message: "This reward is out of stock. Please choose another reward.",
   },
   {
+    match: ["redemption request could not be verified"],
+    message: "This redemption could not be verified. Please refresh and try again.",
+  },
+  {
     match: ["Pickup time must be between", "Scheduled time"],
     message: "Please choose a future pickup time from 08:00 to before 17:00.",
   },
@@ -90,7 +94,8 @@ export function successText(message, fallback = "The action was completed succes
   if (raw.includes("Pickup request saved") || raw.includes("created successfully")) {
     return "Pickup request saved. The list has been refreshed.";
   }
-  if (raw.includes("Reward exchange request created")) return "Reward redemption request created. Points have been deducted from the wallet.";
+  if (raw.includes("Reward redeemed")) return "Reward redeemed successfully. Points have been deducted from your wallet.";
+  if (raw.includes("Reward exchange request created")) return "Reward redeemed successfully. Points have been deducted from your wallet.";
   if (raw.includes("Driver approved")) return "Driver approved and activated.";
   if (raw.includes("Driver disabled")) return "Driver disabled.";
   if (raw.includes("Driver updated")) return "Driver status updated.";

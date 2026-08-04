@@ -320,6 +320,7 @@ model RewardExchange {
   createdAt     DateTime @default(now())
   status        String   // PENDING, SUCCESS, FAILED
   voucherCodeUsed String?
+  idempotencyKey String?  @unique
 
   customer      Customer @relation(fields: [idCustomer], references: [idCustomer])
   reward        Reward   @relation(fields: [idReward], references: [idReward])

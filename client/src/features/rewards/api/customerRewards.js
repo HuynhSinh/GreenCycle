@@ -8,8 +8,9 @@ export function getCustomerRewards() {
   return apiRequest('/customer/rewards');
 }
 
-export function redeemCustomerReward(rewardId) {
+export function redeemCustomerReward(rewardId, idempotencyKey) {
   return apiRequest(`/customer/rewards/${rewardId}/redeem`, {
     method: 'POST',
+    body: JSON.stringify({ idempotencyKey }),
   });
 }

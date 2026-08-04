@@ -100,13 +100,24 @@ export const listAvailableRewards = async (accountId) => {
   return rewards.map((reward) => mapReward(reward, wallet.balance));
 };
 
-export const redeemReward = async (accountId, rewardId) => {
+const mapRedemptionResult = (result) => ({
+  exchange: mapExchange(result.exchange),
+  wallet: {
+    id: result.wallet.idWallet,
+    balance: result.wallet.balance,
+    transactions: result.wallet.transactions.map(mapTransaction),
+  },
+  idempotent: Boolean(result.idempotent),
+});
+
+export const redeemReward = async (accountId, rewardId, idempotencyKey) => {
   const customer = await getOwnCustomerOrThrow(accountId);
 
   try {
     const result = await customerRewardRepository.redeemReward({
       idCustomer: customer.idCustomer,
       rewardId,
+      idempotencyKey,
     });
 
     if (result.error === "REWARD_NOT_FOUND") {
@@ -125,15 +136,23 @@ export const redeemReward = async (accountId, rewardId) => {
       throw new AppError("Not enough eco-points to redeem this reward", 409);
     }
 
-    return {
-      exchange: mapExchange(result.exchange),
-      wallet: {
-        id: result.wallet.idWallet,
-        balance: result.wallet.balance,
-        transactions: result.wallet.transactions.map(mapTransaction),
-      },
-    };
+    if (result.error === "IDEMPOTENCY_KEY_CONFLICT") {
+      throw new AppError("This redemption request could not be verified. Please refresh and try again.", 409);
+    }
+
+    return mapRedemptionResult(result);
   } catch (error) {
+    if (error.code === "P2002") {
+      const existingExchange = await customerRewardRepository.findExchangeByIdempotencyKey(idempotencyKey);
+
+      if (existingExchange?.idCustomer === customer.idCustomer && existingExchange.idReward === rewardId) {
+        const wallet = await customerRewardRepository.findWalletByCustomerId(customer.idCustomer);
+        return mapRedemptionResult({ exchange: existingExchange, wallet, idempotent: true });
+      }
+
+      throw new AppError("This redemption request could not be verified. Please refresh and try again.", 409);
+    }
+
     if (error.code === "OUT_OF_STOCK") {
       throw new AppError("This reward is out of stock", 409);
     }
