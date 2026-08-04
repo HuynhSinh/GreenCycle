@@ -22,10 +22,14 @@ export const getOwnProfile = asyncHandler(async (req, res) => {
 });
 
 export const updateOwnProfile = asyncHandler(async (req, res) => {
+  const currentDriver = await driverService.getOwnDriverProfile(req.user.id);
   const driver = await driverService.updateOwnDriverProfile(req.user.id, req.validated.body);
   res.json({
     data: driver,
-    message: "Driver profile submitted and waiting for admin approval",
+    message:
+      currentDriver.status === "ACTIVE"
+        ? "Driver profile updated successfully"
+        : "Driver profile submitted and waiting for admin approval",
   });
 });
 

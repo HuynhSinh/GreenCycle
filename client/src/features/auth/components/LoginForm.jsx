@@ -129,7 +129,7 @@ export function LoginForm() {
         {/* Identifier Field */}
         <div className="flex flex-col gap-1.5">
           <label htmlFor="identifier" className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
-            Email or Username
+            Email or Username <span className="text-rose-600">*</span>
           </label>
           <input
             id="identifier"
@@ -154,7 +154,7 @@ export function LoginForm() {
         <div className="flex flex-col gap-1.5">
           <div className="flex justify-between items-center">
             <label htmlFor="password" className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
-              Password
+              Password <span className="text-rose-600">*</span>
             </label>
             <a
               href="#forgot"

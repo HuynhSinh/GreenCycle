@@ -109,7 +109,7 @@ export function SignUpForm() {
           {/* Full Name Field */}
           <div className="flex flex-col gap-1.25">
             <label htmlFor="fullName" className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
-              Full Name
+              Full Name <span className="text-rose-600">*</span>
             </label>
             <input
               id="fullName"
@@ -133,7 +133,7 @@ export function SignUpForm() {
           {/* Email Field */}
           <div className="flex flex-col gap-1.25">
             <label htmlFor="email" className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
-              Email Address
+              Email Address <span className="text-rose-600">*</span>
             </label>
             <input
               id="email"
@@ -157,7 +157,7 @@ export function SignUpForm() {
           {/* Password Field */}
           <div className="flex flex-col gap-1.25">
             <label htmlFor="password" className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
-              Password
+              Password <span className="text-rose-600">*</span>
             </label>
             <div className="relative">
               <input
@@ -252,7 +252,7 @@ export function SignUpForm() {
           {/* Confirm Password Field */}
           <div className="flex flex-col gap-1.25">
             <label htmlFor="confirmPassword" className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
-              Confirm Password
+              Confirm Password <span className="text-rose-600">*</span>
             </label>
             <div className="relative">
               <input
@@ -293,6 +293,7 @@ export function SignUpForm() {
                 className="w-4 h-4 rounded mt-0.5 border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer disabled:cursor-not-allowed"
               />
               <span>
+                <span className="text-rose-600">*</span>{' '}
                 I agree to the{' '}
                 <a
                   href="#terms"

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  Camera,
   CheckCircle2,
   ClipboardCheck,
   Clock,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../auth/api/auth';
+import { getDriverAssignments, updateDriverAssignmentStatus } from '../../driver-assignments/api/driverAssignments';
 import { getDriverProfile, updateDriverProfile } from '../../drivers/api/drivers';
 
 const emptyProfile = {
@@ -22,6 +24,7 @@ const emptyProfile = {
   phoneNumber: '',
   vehicleInfo: '',
   licensePlate: '',
+  maxCapacityKg: '',
   email: '',
 };
 
@@ -47,6 +50,14 @@ export default function DriverDashboard() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profile, setProfile] = useState(null);
+  const [assignments, setAssignments] = useState([]);
+  const [activeAssignmentId, setActiveAssignmentId] = useState(null);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState('');
+  const [assignmentLoading, setAssignmentLoading] = useState(false);
+  const [assignmentMessage, setAssignmentMessage] = useState('');
+  const [assignmentError, setAssignmentError] = useState('');
+  const [collectionForm, setCollectionForm] = useState({ evidenceImageDataUri: '', items: {} });
+  const [activeTab, setActiveTab] = useState('profile');
   const [form, setForm] = useState(emptyProfile);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -57,6 +68,7 @@ export default function DriverDashboard() {
   const status = profile?.status || 'PENDING_PROFILE';
   const active = status === 'ACTIVE';
   const StatusIcon = statusMeta[status]?.icon || AlertTriangle;
+  const selectedAssignment = assignments.find((assignment) => assignment.id === selectedAssignmentId);
 
   const loadProfile = async () => {
     setLoading(true);
@@ -72,6 +84,7 @@ export default function DriverDashboard() {
         phoneNumber: data.driver?.phoneNumber || '',
         vehicleInfo: data.driver?.vehicleInfo || '',
         licensePlate: data.driver?.licensePlate || '',
+        maxCapacityKg: data.driver?.maxCapacityKg ? String(data.driver.maxCapacityKg) : '',
         email: data.email || '',
       });
     } catch (requestError) {
@@ -81,9 +94,38 @@ export default function DriverDashboard() {
     }
   };
 
+  const loadAssignments = async () => {
+    setAssignmentLoading(true);
+    setAssignmentError('');
+
+    try {
+      const response = await getDriverAssignments();
+      const data = response.data || {};
+      const nextAssignments = data.assignments || [];
+
+      setAssignments(nextAssignments);
+      setActiveAssignmentId(data.activeAssignmentId || null);
+      setSelectedAssignmentId((current) =>
+        nextAssignments.some((assignment) => assignment.id === current) ? current : nextAssignments[0]?.id || '',
+      );
+    } catch (requestError) {
+      setAssignmentError(requestError.message || 'Could not load assignments.');
+      setAssignments([]);
+      setActiveAssignmentId(null);
+    } finally {
+      setAssignmentLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadProfile();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'assignments' && active) {
+      loadAssignments();
+    }
+  }, [activeTab, active]);
 
   const profileStats = useMemo(
     () => [
@@ -128,6 +170,75 @@ export default function DriverDashboard() {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
+  const handleCollectionWeightChange = (wasteItemId, value) => {
+    setCollectionForm((current) => ({
+      ...current,
+      items: {
+        ...current.items,
+        [wasteItemId]: value,
+      },
+    }));
+  };
+
+  const handleEvidenceChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCollectionForm((current) => ({
+        ...current,
+        evidenceImageDataUri: String(reader.result || ''),
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const resetCollectionForm = (assignment) => {
+    setCollectionForm({
+      evidenceImageDataUri: '',
+      items: Object.fromEntries((assignment?.wasteItems || []).map((item) => [item.id, item.actualWeight || item.scheduledWeight || ''])),
+    });
+  };
+
+  const handleSelectAssignment = (assignment) => {
+    setSelectedAssignmentId(assignment.id);
+    setAssignmentMessage('');
+    setAssignmentError('');
+    resetCollectionForm(assignment);
+  };
+
+  const handleAssignmentStatus = async (nextStatus) => {
+    if (!selectedAssignment) return;
+
+    setAssignmentLoading(true);
+    setAssignmentMessage('');
+    setAssignmentError('');
+
+    try {
+      const payload =
+        nextStatus === 'COLLECTED'
+          ? {
+              status: nextStatus,
+              evidenceImageDataUri: collectionForm.evidenceImageDataUri,
+              items: selectedAssignment.wasteItems.map((item) => ({
+                wasteItemId: item.id,
+                actualWeight: Number(collectionForm.items[item.id] || 0),
+              })),
+            }
+          : { status: nextStatus };
+      const result = await updateDriverAssignmentStatus(selectedAssignment.id, payload);
+
+      setAssignmentMessage(result.message || 'Assignment updated.');
+      await loadAssignments();
+      resetCollectionForm(result.data);
+    } catch (requestError) {
+      setAssignmentError(requestError.message || 'Could not update assignment.');
+    } finally {
+      setAssignmentLoading(false);
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSaving(true);
@@ -140,17 +251,24 @@ export default function DriverDashboard() {
         phoneNumber: form.phoneNumber.trim(),
         vehicleInfo: form.vehicleInfo.trim(),
         licensePlate: form.licensePlate.trim(),
+        maxCapacityKg: Number(form.maxCapacityKg),
         email: form.email.trim(),
       };
       const response = await updateDriverProfile(payload);
+      const wasApproved = profile?.status === 'ACTIVE';
 
       setProfile(response.data);
-      setMessage(response.message || 'Profile submitted and waiting for admin approval.');
+      setMessage(
+        wasApproved
+          ? 'Profile updated successfully.'
+          : response.message || 'Profile submitted and waiting for admin approval.',
+      );
       setForm({
         fullName: response.data.driver?.fullName || '',
         phoneNumber: response.data.driver?.phoneNumber || '',
         vehicleInfo: response.data.driver?.vehicleInfo || '',
         licensePlate: response.data.driver?.licensePlate || '',
+        maxCapacityKg: response.data.driver?.maxCapacityKg ? String(response.data.driver.maxCapacityKg) : '',
         email: response.data.email || '',
       });
     } catch (requestError) {
@@ -177,8 +295,8 @@ export default function DriverDashboard() {
         </div>
 
         <nav className="flex-1 space-y-2 p-4">
-          <NavItem icon={User} label="Profile" sidebarOpen={sidebarOpen} active />
-          <NavItem icon={Truck} label="Assignments" sidebarOpen={sidebarOpen} disabled={!active} />
+          <NavItem icon={User} label="Profile" sidebarOpen={sidebarOpen} active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
+          <NavItem icon={Truck} label="Assignments" sidebarOpen={sidebarOpen} active={activeTab === 'assignments'} disabled={!active} onClick={() => setActiveTab('assignments')} />
           <NavItem icon={ClipboardCheck} label="History" sidebarOpen={sidebarOpen} disabled={!active} />
         </nav>
 
@@ -205,7 +323,9 @@ export default function DriverDashboard() {
           </button>
           <div className="min-w-0 px-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Driver Portal</p>
-            <h1 className="truncate text-xl font-bold text-slate-900 sm:text-2xl">My Profile</h1>
+            <h1 className="truncate text-xl font-bold text-slate-900 sm:text-2xl">
+              {activeTab === 'assignments' ? 'My Assignments' : 'My Profile'}
+            </h1>
           </div>
           <span className={`hidden rounded-full px-3 py-1 text-xs font-semibold sm:inline-flex ${statusMeta[status]?.tone}`}>
             {statusMeta[status]?.label || status}
@@ -219,6 +339,145 @@ export default function DriverDashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+              {activeTab === 'assignments' ? (
+              <section className="space-y-6 xl:col-span-2">
+                {assignmentError && (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
+                    {assignmentError}
+                  </div>
+                )}
+                {assignmentMessage && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+                    {assignmentMessage}
+                  </div>
+                )}
+
+                <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+                  <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+                    <div className="border-b border-slate-200 p-5">
+                      <h2 className="text-lg font-bold text-slate-900">Assigned Pickups</h2>
+                      <p className="mt-1 text-sm text-slate-600">Work on one pickup at a time and submit evidence when collection is complete.</p>
+                    </div>
+                    <div className="divide-y divide-slate-200">
+                      {assignments.map((assignment) => {
+                        const selected = assignment.id === selectedAssignmentId;
+                        return (
+                          <button
+                            key={assignment.id}
+                            type="button"
+                            onClick={() => handleSelectAssignment(assignment)}
+                            className={`w-full px-5 py-4 text-left transition-colors ${selected ? 'bg-emerald-50' : 'hover:bg-slate-50'}`}
+                          >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <p className="font-semibold text-slate-950">{assignment.customer}</p>
+                                <p className="mt-1 text-sm text-slate-600">{assignment.address}, {assignment.ward}</p>
+                                <p className="mt-1 text-xs font-medium text-slate-500">{assignment.scheduledTimeLabel}</p>
+                              </div>
+                              <span className={`self-start rounded-full px-3 py-1 text-xs font-semibold ${taskStatusStyles[assignment.status] || 'bg-slate-100 text-slate-700'}`}>
+                                {assignment.status}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                      {assignments.length === 0 && (
+                        <div className="px-5 py-10 text-center text-sm font-medium text-slate-500">
+                          {assignmentLoading ? 'Loading assignments...' : 'No assigned pickups.'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <aside className="self-start rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                    {selectedAssignment ? (
+                      <>
+                        <div className="mb-5">
+                          <h2 className="text-lg font-bold text-slate-900">Pickup Task</h2>
+                          <p className="mt-1 text-sm text-slate-600">{selectedAssignment.district} - {selectedAssignment.scheduledTimeLabel}</p>
+                        </div>
+
+                        <div className="space-y-3">
+                          <Info label="Customer" value={selectedAssignment.customer} />
+                          <Info label="Address" value={`${selectedAssignment.address}, ${selectedAssignment.ward}`} />
+                          <Info label="Scheduled weight" value={`${Number(selectedAssignment.totalWeight || 0).toFixed(1).replace(/\.0$/, '')} kg`} />
+                        </div>
+
+                        <div className="mt-5 space-y-3">
+                          {selectedAssignment.status === 'ASSIGNED' && (
+                            <button
+                              type="button"
+                              onClick={() => handleAssignmentStatus('COLLECTING')}
+                              disabled={assignmentLoading || (activeAssignmentId && activeAssignmentId !== selectedAssignment.id)}
+                              className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            >
+                              <Truck className="h-4 w-4" />
+                              Start Pickup
+                            </button>
+                          )}
+                          {selectedAssignment.status === 'COLLECTING' && (
+                            <button
+                              type="button"
+                              onClick={() => handleAssignmentStatus('ARRIVED')}
+                              disabled={assignmentLoading}
+                              className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                              Mark Arrived
+                            </button>
+                          )}
+
+                          {['COLLECTING', 'ARRIVED'].includes(selectedAssignment.status) && (
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                              <Field label="Evidence photo" required>
+                                <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white px-4 py-4 text-center transition-colors hover:bg-slate-50">
+                                  {collectionForm.evidenceImageDataUri ? (
+                                    <img src={collectionForm.evidenceImageDataUri} alt="" className="mb-3 h-32 w-full rounded-lg object-cover" />
+                                  ) : (
+                                    <Camera className="mb-2 h-7 w-7 text-slate-400" />
+                                  )}
+                                  <span className="text-sm font-semibold text-slate-700">Choose photo</span>
+                                  <input type="file" accept="image/*" capture="environment" onChange={handleEvidenceChange} className="sr-only" />
+                                </label>
+                              </Field>
+
+                              <div className="mt-4 space-y-3">
+                                {selectedAssignment.wasteItems.map((item) => (
+                                  <Field key={item.id} label={`${item.category} actual kg`} required>
+                                    <input
+                                      required
+                                      type="number"
+                                      min="0.1"
+                                      step="0.1"
+                                      value={collectionForm.items[item.id] || ''}
+                                      onChange={(event) => handleCollectionWeightChange(item.id, event.target.value)}
+                                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                                    />
+                                  </Field>
+                                ))}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleAssignmentStatus('COLLECTED')}
+                                disabled={assignmentLoading}
+                                className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                              >
+                                <ClipboardCheck className="h-4 w-4" />
+                                Mark Collected
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="py-8 text-center text-sm font-medium text-slate-500">Select an assignment to view details.</div>
+                    )}
+                  </aside>
+                </section>
+              </section>
+              ) : (
+              <>
               <section className="space-y-6">
                 {error && (
                   <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
@@ -263,7 +522,7 @@ export default function DriverDashboard() {
                   </div>
 
                   <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2">
-                    <Field label="Full name">
+                    <Field label="Full name" required>
                       <input
                         required
                         value={form.fullName}
@@ -271,7 +530,7 @@ export default function DriverDashboard() {
                         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                       />
                     </Field>
-                    <Field label="Phone number">
+                    <Field label="Phone number" required>
                       <input
                         required
                         minLength={8}
@@ -280,7 +539,7 @@ export default function DriverDashboard() {
                         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                       />
                     </Field>
-                    <Field label="Vehicle">
+                    <Field label="Vehicle" required>
                       <input
                         required
                         value={form.vehicleInfo}
@@ -289,7 +548,7 @@ export default function DriverDashboard() {
                         placeholder="Truck, van, motorbike..."
                       />
                     </Field>
-                    <Field label="License plate">
+                    <Field label="License plate" required>
                       <input
                         required
                         value={form.licensePlate}
@@ -297,7 +556,18 @@ export default function DriverDashboard() {
                         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                       />
                     </Field>
-                    <Field label="Email">
+                    <Field label="Maximum capacity (kg)" required>
+                      <input
+                        required
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        value={form.maxCapacityKg}
+                        onChange={(event) => handleChange('maxCapacityKg', event.target.value)}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                      />
+                    </Field>
+                    <Field label="Email" required>
                       <input
                         required
                         type="email"
@@ -345,12 +615,15 @@ export default function DriverDashboard() {
                   <Info label="Phone" value={profile?.driver?.phoneNumber || 'Not submitted'} />
                   <Info label="Vehicle" value={profile?.driver?.vehicleInfo || 'Not submitted'} />
                   <Info label="License plate" value={profile?.driver?.licensePlate || 'Not submitted'} />
+                  <Info label="Maximum capacity" value={profile?.driver?.maxCapacityKg ? `${profile.driver.maxCapacityKg} kg` : 'Not submitted'} />
                 </div>
 
                 <div className={`mt-5 rounded-lg px-4 py-3 text-sm font-semibold ${statusMeta[status]?.tone}`}>
                   {statusMeta[status]?.label || status}
                 </div>
               </aside>
+              </>
+              )}
             </div>
           )}
         </main>
@@ -359,10 +632,13 @@ export default function DriverDashboard() {
   );
 }
 
-function Field({ label, children }) {
+function Field({ label, children, required = false }) {
   return (
     <label className="block">
-      <span className="text-sm font-semibold text-slate-700">{label}</span>
+      <span className="text-sm font-semibold text-slate-700">
+        {label}
+        {required && <span className="text-rose-600"> *</span>}
+      </span>
       <div className="mt-2">{children}</div>
     </label>
   );
@@ -377,11 +653,20 @@ function Info({ label, value }) {
   );
 }
 
-function NavItem({ icon: Icon, label, sidebarOpen, active, disabled }) {
+const taskStatusStyles = {
+  ASSIGNED: 'bg-indigo-100 text-indigo-800',
+  COLLECTING: 'bg-sky-100 text-sky-800',
+  ARRIVED: 'bg-amber-100 text-amber-800',
+  COLLECTED: 'bg-emerald-100 text-emerald-800',
+  FAILED: 'bg-rose-100 text-rose-800',
+};
+
+function NavItem({ icon: Icon, label, sidebarOpen, active, disabled, onClick }) {
   return (
     <button
       type="button"
       disabled={disabled}
+      onClick={onClick}
       className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 transition-colors ${
         active ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:bg-slate-800'
       } disabled:cursor-not-allowed disabled:opacity-50`}

@@ -29,15 +29,15 @@ export default function CustomerDashboard() {
   ];
 
   const recentPickups = [
-    { id: 'PK-1001', status: 'COMPLETED', date: '2026-07-19', items: '5 kg' },
-    { id: 'PK-1002', status: 'IN_TRANSIT', date: '2026-07-20', items: '3 kg' },
+    { id: 'PK-1001', status: 'COLLECTED', date: '2026-07-19', items: '5 kg' },
+    { id: 'PK-1002', status: 'COLLECTING', date: '2026-07-20', items: '3 kg' },
     { id: 'PK-1003', status: 'PENDING', date: '2026-07-20', items: '2 kg' },
   ];
 
   const getStatusColor = (status) => {
     const colors = {
-      COMPLETED: 'bg-emerald-100 text-emerald-800',
-      IN_TRANSIT: 'bg-blue-100 text-blue-800',
+      COLLECTED: 'bg-emerald-100 text-emerald-800',
+      COLLECTING: 'bg-blue-100 text-blue-800',
       PENDING: 'bg-yellow-100 text-yellow-800',
     };
     return colors[status] || 'bg-slate-100 text-slate-800';

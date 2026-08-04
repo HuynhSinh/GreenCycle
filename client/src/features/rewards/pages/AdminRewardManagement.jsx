@@ -469,8 +469,9 @@ export default function AdminRewardManagement() {
                       <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageChange} className="sr-only" />
                     </label>
                   </Field>
-                  <Field label="Reward name">
+                  <Field label="Reward name" required>
                     <input
+                      required
                       value={form.name}
                       onChange={(event) => handleChange('name', event.target.value)}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
@@ -487,8 +488,9 @@ export default function AdminRewardManagement() {
                     />
                   </Field>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field label="Type">
+                    <Field label="Type" required>
                       <select
+                        required
                         value={form.type}
                         onChange={(event) => handleChange('type', event.target.value)}
                         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
@@ -497,8 +499,9 @@ export default function AdminRewardManagement() {
                         <option value="PHYSICAL_PRODUCT">Physical product</option>
                       </select>
                     </Field>
-                    <Field label="Point cost">
+                    <Field label="Point cost" required>
                       <input
+                        required
                         type="number"
                         min="1"
                         value={form.pointCost}
@@ -580,10 +583,13 @@ function formatType(type) {
   return type === 'DIGITAL_VOUCHER' ? 'Digital voucher' : 'Physical product';
 }
 
-function Field({ label, children }) {
+function Field({ label, children, required = false }) {
   return (
     <label className="block">
-      <span className="text-sm font-semibold text-slate-700">{label}</span>
+      <span className="text-sm font-semibold text-slate-700">
+        {label}
+        {required && <span className="text-rose-600"> *</span>}
+      </span>
       <div className="mt-2">{children}</div>
     </label>
   );

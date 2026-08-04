@@ -20,6 +20,7 @@ export const createDriverAccountSchema = z.object({
     phoneNumber: z.string().trim().min(8).max(20).optional(),
     vehicleInfo: z.string().trim().max(120).optional().default(""),
     licensePlate: z.string().trim().max(30).optional().default(""),
+    maxCapacityKg: z.coerce.number().positive().optional(),
   }),
 });
 
@@ -35,6 +36,7 @@ export const updateOwnDriverProfileSchema = z.object({
     phoneNumber: z.string().trim().min(8).max(20),
     vehicleInfo: z.string().trim().min(1).max(120),
     licensePlate: z.string().trim().min(1).max(30),
+    maxCapacityKg: z.coerce.number().positive(),
     email: z.string().trim().email().max(120),
   }),
 });

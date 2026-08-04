@@ -136,7 +136,6 @@ Các chức năng ngoài phạm vi có thể được phát triển sau khi MVP 
 
 | Mã | Quy tắc |
 |---|---|
-| BR-01 | MVP chỉ tiếp nhận yêu cầu có địa chỉ thuộc khu vực phục vụ tại Quận 5. |
 | BR-02 | Yêu cầu phải có ít nhất một loại e-waste và số lượng hoặc khối lượng lớn hơn 0. |
 | BR-03 | Ngày giờ mong muốn phải thuộc khung giờ hoạt động và không nằm trong quá khứ. |
 | BR-04 | Eco-Point hiển thị khi tạo yêu cầu chỉ là ước tính. Điểm cuối cùng dựa trên kết quả xác minh thực tế. |

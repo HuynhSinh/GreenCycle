@@ -23,7 +23,6 @@ import {
   approveAdminDriver,
   createAdminDriver,
   disableAdminDriver,
-  enableAdminDriver,
   getAdminDrivers,
 } from '../api/drivers';
 
@@ -37,6 +36,7 @@ const emptyForm = {
   phoneNumber: '',
   vehicleInfo: '',
   licensePlate: '',
+  maxCapacityKg: '',
 };
 
 const statusStyles = {
@@ -181,6 +181,7 @@ export default function DriverManagement() {
         ...(form.phoneNumber.trim() ? { phoneNumber: form.phoneNumber.trim() } : {}),
         vehicleInfo: form.vehicleInfo.trim(),
         licensePlate: form.licensePlate.trim(),
+        ...(form.maxCapacityKg ? { maxCapacityKg: Number(form.maxCapacityKg) } : {}),
       };
       const result = await createAdminDriver(payload);
 
@@ -206,7 +207,6 @@ export default function DriverManagement() {
     try {
       const actions = {
         approve: approveAdminDriver,
-        enable: enableAdminDriver,
         disable: disableAdminDriver,
       };
       const result = await actions[action](selectedDriver.id);
@@ -382,7 +382,11 @@ export default function DriverManagement() {
                           </td>
                           <td className="px-5 py-4 text-sm text-slate-700">
                             <p>{driver.driver?.vehicleInfo || 'Not set'}</p>
-                            <p className="mt-1 text-slate-500">{driver.driver?.licensePlate || 'No plate'}</p>
+                            <p className="mt-1 text-slate-500">
+                              {[driver.driver?.licensePlate || 'No plate', driver.driver?.maxCapacityKg ? `${driver.driver.maxCapacityKg} kg max` : null]
+                                .filter(Boolean)
+                                .join(' - ')}
+                            </p>
                           </td>
                           <td className="px-5 py-4 text-sm text-slate-700">
                             {driver.driver ? `${driver.driver.activeAssignments} active / ${driver.driver.totalAssignments} total` : 'No profile'}
@@ -461,6 +465,7 @@ export default function DriverManagement() {
                   <Info label="Phone" value={selectedDriver.driver?.phoneNumber || 'Not set'} />
                   <Info label="Vehicle" value={selectedDriver.driver?.vehicleInfo || 'Not set'} />
                   <Info label="License plate" value={selectedDriver.driver?.licensePlate || 'Not set'} />
+                  <Info label="Maximum capacity" value={selectedDriver.driver?.maxCapacityKg ? `${selectedDriver.driver.maxCapacityKg} kg` : 'Not set'} />
                   <Info label="Assignments" value={selectedDriver.driver ? `${selectedDriver.driver.activeAssignments} active / ${selectedDriver.driver.totalAssignments} total` : 'No profile'} />
                   <div>
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[selectedDriver.status]}`}>
@@ -476,15 +481,6 @@ export default function DriverManagement() {
                 )}
 
                 <div className="mt-6 grid grid-cols-1 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleDriverAction('approve')}
-                    disabled={actionLoading || !selectedDriver.profileComplete || selectedDriver.status === 'ACTIVE'}
-                    className="flex items-center justify-center gap-2 rounded-lg border border-emerald-600 px-4 py-3 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400"
-                  >
-                    <UserCheck className="h-4 w-4" />
-                    Approve Driver
-                  </button>
                   {selectedDriver.status === 'ACTIVE' ? (
                     <button
                       type="button"
@@ -498,12 +494,12 @@ export default function DriverManagement() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => handleDriverAction('enable')}
+                      onClick={() => handleDriverAction('approve')}
                       disabled={actionLoading || !selectedDriver.profileComplete}
                       className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
-                      <CheckCircle2 className="h-4 w-4" />
-                      Enable Driver
+                      <UserCheck className="h-4 w-4" />
+                      Approve Driver
                     </button>
                   )}
                 </div>
@@ -528,13 +524,13 @@ export default function DriverManagement() {
                 </div>
 
                 <form onSubmit={handleCreateDriver} className="space-y-4">
-                  <Field label="Username">
+                  <Field label="Username" required>
                     <input minLength={3} required value={form.username} onChange={(event) => handleFormChange('username', event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
                   </Field>
                   <Field label="Email">
                     <input type="email" value={form.email} onChange={(event) => handleFormChange('email', event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" placeholder="Optional" />
                   </Field>
-                  <Field label="Temporary password">
+                  <Field label="Temporary password" required>
                     <input type="password" minLength={8} required value={form.password} onChange={(event) => handleFormChange('password', event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
                   </Field>
                   <Field label="Full name">
@@ -548,6 +544,9 @@ export default function DriverManagement() {
                   </Field>
                   <Field label="License plate">
                     <input value={form.licensePlate} onChange={(event) => handleFormChange('licensePlate', event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" placeholder="Optional" />
+                  </Field>
+                  <Field label="Maximum capacity (kg)">
+                    <input type="number" min="0.1" step="0.1" value={form.maxCapacityKg} onChange={(event) => handleFormChange('maxCapacityKg', event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" placeholder="Optional" />
                   </Field>
 
                   {message && (
@@ -583,10 +582,13 @@ function Info({ label, value }) {
   );
 }
 
-function Field({ label, children }) {
+function Field({ label, children, required = false }) {
   return (
     <label className="block">
-      <span className="text-sm font-semibold text-slate-700">{label}</span>
+      <span className="text-sm font-semibold text-slate-700">
+        {label}
+        {required && <span className="text-rose-600"> *</span>}
+      </span>
       <div className="mt-2">{children}</div>
     </label>
   );

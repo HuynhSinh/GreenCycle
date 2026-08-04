@@ -144,6 +144,31 @@ export const findDriverById = (idDriver) =>
     where: { idDriver },
   });
 
+export const sumDriverAssignedWeightForSchedule = async ({ idDriver, startDate, endDate, excludeRequestId }) => {
+  const result = await prisma.pickupRequest.aggregate({
+    where: {
+      idRequest: excludeRequestId ? { not: excludeRequestId } : undefined,
+      scheduledTime: {
+        gte: startDate,
+        lt: endDate,
+      },
+      status: {
+        in: ["ASSIGNED", "COLLECTING", "ARRIVED", "COLLECTED"],
+      },
+      assignment: {
+        is: {
+          idDriver,
+        },
+      },
+    },
+    _sum: {
+      totalWeight: true,
+    },
+  });
+
+  return result._sum.totalWeight || 0;
+};
+
 export const countDriverAssignmentsAtTime = ({ idDriver, scheduledTime, excludeRequestId }) =>
   prisma.pickupAssignment.count({
     where: {
@@ -152,7 +177,7 @@ export const countDriverAssignmentsAtTime = ({ idDriver, scheduledTime, excludeR
         idRequest: excludeRequestId ? { not: excludeRequestId } : undefined,
         scheduledTime,
         status: {
-          in: ["ASSIGNED", "COLLECTING", "ARRIVED", "COLLECTED", "IN_TRANSIT"],
+          in: ["ASSIGNED", "COLLECTING", "ARRIVED", "COLLECTED"],
         },
       },
     },

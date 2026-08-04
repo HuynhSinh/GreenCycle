@@ -10,6 +10,14 @@ const toDayRange = (dateString) => {
   return { startDate, endDate };
 };
 
+const toDayRangeFromDate = (date) => {
+  const startDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const endDate = new Date(startDate);
+  endDate.setUTCDate(endDate.getUTCDate() + 1);
+
+  return { startDate, endDate };
+};
+
 const formatTime = (date) =>
   new Intl.DateTimeFormat("en-US", {
     hour: "2-digit",
@@ -49,8 +57,9 @@ const mapDriver = (driver) => {
     name: driver.fullName,
     vehicle: [driver.vehicleInfo, driver.licensePlate].filter(Boolean).join(" - ") || "Vehicle not set",
     active: driver.isActive,
+    maxCapacityKg: driver.maxCapacityKg,
     load: formatWeight(assignedWeight),
-    window: driver.isActive ? "Available today" : "Inactive",
+    window: driver.isActive ? `Available today (${formatWeight(driver.maxCapacityKg)} max)` : "Inactive",
     assignments: driver.assignments.length,
     conflict: false,
   };
@@ -122,8 +131,27 @@ export const assignSchedule = async ({ requestId, driverId, routeOrder }, actorI
     throw new AppError("Only active drivers can receive new assignments", 409);
   }
 
+  if (!driver.maxCapacityKg || driver.maxCapacityKg <= 0) {
+    throw new AppError("Driver vehicle capacity must be configured before assignment", 409);
+  }
+
   if (request.status !== "APPROVED") {
     throw new AppError("Only approved pickup requests can be assigned", 409);
+  }
+
+  const { startDate, endDate } = toDayRangeFromDate(request.scheduledTime);
+  const assignedWeight = await collectionScheduleRepository.sumDriverAssignedWeightForSchedule({
+    idDriver: driverId,
+    startDate,
+    endDate,
+    excludeRequestId: requestId,
+  });
+
+  if (assignedWeight + request.totalWeight > driver.maxCapacityKg) {
+    throw new AppError(
+      `Driver capacity exceeded`,
+      409,
+    );
   }
 
   const conflictCount = await collectionScheduleRepository.countDriverAssignmentsAtTime({

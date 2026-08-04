@@ -51,9 +51,6 @@ Tracks the full lifecycle of a pickup request:
 - `COLLECTING`: driver is on the way
 - `ARRIVED`: driver has arrived
 - `COLLECTED`: items have been collected
-- `IN_TRANSIT`: items are being transported
-- `AT_WAREHOUSE`: items reached the sorting warehouse
-- `COMPLETED`: handed to recycling partner and points are completed
 - `CANCELLED`: cancelled by customer
 - `REJECTED`: rejected by admin
 - `FAILED`: pickup failed
@@ -160,6 +157,7 @@ Important fields:
 - `phoneNumber`: unique
 - `vehicleInfo`
 - `licensePlate`
+- `maxCapacityKg`: maximum vehicle load capacity in kilograms
 - `isActive`
 - `currentLat`, `currentLng`
 - `idAccount`: unique account link

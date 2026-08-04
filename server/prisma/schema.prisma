@@ -25,9 +25,6 @@ enum PickupStatus {
   COLLECTING        // Tài xế đang trên đường đến
   ARRIVED           // Tài xế đã đến vị trí
   COLLECTED         // Đã lấy hàng thành công
-  IN_TRANSIT        // Đang vận chuyển về kho/đối tác
-  AT_WAREHOUSE      // Đã nhập kho phân loại
-  COMPLETED         // Đã bàn giao đối tác tái chế & hoàn tất tích điểm
   CANCELLED         // Khách hủy
   REJECTED          // Admin từ chối đơn
   FAILED            // Thu gom thất bại (không liên lạc được, rác sai mô tả)
@@ -113,6 +110,7 @@ model Driver {
   phoneNumber   String   @unique
   vehicleInfo   String?
   licensePlate  String?
+  maxCapacityKg Float    @default(0)
   isActive      Boolean  @default(true)
   currentLat    Float?
   currentLng    Float?

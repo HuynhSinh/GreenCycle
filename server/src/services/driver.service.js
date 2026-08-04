@@ -10,10 +10,10 @@ const getDriverStatus = (account) => {
 
 const mapDriverAccount = (account) => {
   const activeAssignments = account.driver?.assignments?.filter((assignment) =>
-    ["ASSIGNED", "COLLECTING", "ARRIVED", "COLLECTED", "IN_TRANSIT"].includes(assignment.request?.status),
+    ["ASSIGNED", "COLLECTING", "ARRIVED"].includes(assignment.request?.status),
   ) || [];
   const completedAssignments = account.driver?.assignments?.filter((assignment) =>
-    ["COMPLETED", "AT_WAREHOUSE"].includes(assignment.request?.status),
+    assignment.request?.status === "COLLECTED",
   ) || [];
 
   return {
@@ -30,6 +30,7 @@ const mapDriverAccount = (account) => {
           phoneNumber: account.driver.phoneNumber,
           vehicleInfo: account.driver.vehicleInfo || "",
           licensePlate: account.driver.licensePlate || "",
+          maxCapacityKg: account.driver.maxCapacityKg,
           isActive: account.driver.isActive,
           currentLat: account.driver.currentLat,
           currentLng: account.driver.currentLng,
@@ -120,6 +121,7 @@ export const createDriverAccount = async (payload) => {
       phoneNumber: payload.phoneNumber.trim(),
       vehicleInfo: payload.vehicleInfo || null,
       licensePlate: payload.licensePlate || null,
+      maxCapacityKg: payload.maxCapacityKg || 0,
       isActive: false,
     };
   }
@@ -194,6 +196,7 @@ export const updateOwnDriverProfile = async (accountId, payload) => {
       phoneNumber,
       vehicleInfo: payload.vehicleInfo.trim(),
       licensePlate: payload.licensePlate.trim(),
+      maxCapacityKg: payload.maxCapacityKg,
     },
   });
 

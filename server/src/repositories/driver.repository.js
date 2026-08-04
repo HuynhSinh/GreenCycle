@@ -136,7 +136,6 @@ export const updateOwnDriverProfile = ({ idAccount, email, driver }) =>
       },
       update: {
         ...driver,
-        isActive: false,
       },
     });
 
