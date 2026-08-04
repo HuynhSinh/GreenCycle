@@ -31,22 +31,41 @@ const formatWeight = (weight) => {
   return `${rounded} kg`;
 };
 
-const mapRequest = (request) => ({
-  id: request.idRequest,
-  customer: request.customer?.fullName || "Unknown customer",
-  address: request.address?.addressLine || "Unknown address",
-  ward: request.address?.ward || "Unspecified ward",
-  district: request.address?.district || "Unspecified district",
-  preferredTime: request.note?.match(/preferred:\s*([^;]+)/i)?.[1] || formatTime(request.scheduledTime),
-  scheduledTime: formatTime(request.scheduledTime),
-  status: request.status,
-  weight: formatWeight(request.totalWeight || request.wasteItems.reduce((total, item) => total + item.weight, 0)),
-  items: request.wasteItems.map((item) => item.category?.name).filter(Boolean).join(", ") || "E-waste items",
-  driverId: request.assignment?.idDriver || null,
-  priority: request.totalWeight >= 15 ? "High" : "Normal",
-});
+const mapRequest = (request) => {
+  const evidenceImagesByUrl = new Map();
 
-const mapDriver = (driver) => {
+  for (const item of request.wasteItems) {
+    for (const image of item.images || []) {
+      if (image.type !== "COLLECTION_EVIDENCE" || evidenceImagesByUrl.has(image.url)) continue;
+
+      evidenceImagesByUrl.set(image.url, {
+        id: image.idImage,
+        url: image.url,
+        type: image.type,
+        category: "Collection evidence",
+        createdAt: image.createdAt,
+      });
+    }
+  }
+
+  return {
+    id: request.idRequest,
+    customer: request.customer?.fullName || "Unknown customer",
+    address: request.address?.addressLine || "Unknown address",
+    ward: request.address?.ward || "Unspecified ward",
+    district: request.address?.district || "Unspecified district",
+    preferredTime: request.note?.match(/preferred:\s*([^;]+)/i)?.[1] || formatTime(request.scheduledTime),
+    scheduledTime: formatTime(request.scheduledTime),
+    status: request.status,
+    weight: formatWeight(request.totalWeight || request.wasteItems.reduce((total, item) => total + item.weight, 0)),
+    items: request.wasteItems.map((item) => item.category?.name).filter(Boolean).join(", ") || "E-waste items",
+    evidenceImages: [...evidenceImagesByUrl.values()],
+    driverId: request.assignment?.idDriver || null,
+    priority: request.totalWeight >= 15 ? "High" : "Normal",
+  };
+};
+
+const mapDriver = (driver, hasDateFilter) => {
   const assignedWeight = driver.assignments.reduce(
     (total, assignment) => total + (assignment.request?.totalWeight || 0),
     0,
@@ -59,7 +78,9 @@ const mapDriver = (driver) => {
     active: driver.isActive,
     maxCapacityKg: driver.maxCapacityKg,
     load: formatWeight(assignedWeight),
-    window: driver.isActive ? `Available today (${formatWeight(driver.maxCapacityKg)} max)` : "Inactive",
+    window: driver.isActive
+      ? `${hasDateFilter ? "Available on selected date" : "Active"} (${formatWeight(driver.maxCapacityKg)} max)`
+      : "Inactive",
     assignments: driver.assignments.length,
     conflict: false,
   };
@@ -78,8 +99,8 @@ const buildMetrics = (statusCounts, drivers) => ({
   timeConflicts: drivers.filter((driver) => driver.conflict).length,
 });
 
-export const listSchedule = async ({ date, district = "District 5", status = "ALL", page = 1, limit = 20 }) => {
-  const { startDate, endDate } = toDayRange(date);
+export const listSchedule = async ({ date, district = "", status = "ALL", page = 1, limit = 20 }) => {
+  const { startDate, endDate } = date ? toDayRange(date) : { startDate: null, endDate: null };
   const skip = (page - 1) * limit;
 
   const [requestsRaw, totalRequests, statusCounts, driversRaw] = await Promise.all([
@@ -95,7 +116,7 @@ export const listSchedule = async ({ date, district = "District 5", status = "AL
   ]);
 
   const requests = requestsRaw.map(mapRequest);
-  const drivers = driversRaw.map(mapDriver);
+  const drivers = driversRaw.map((driver) => mapDriver(driver, Boolean(date)));
   const totalPages = Math.max(1, Math.ceil(totalRequests / limit));
 
   return {

@@ -1,5 +1,6 @@
 import AppError from "../utils/AppError.js";
 import * as driverAssignmentRepository from "../repositories/driverAssignment.repository.js";
+import { uploadPickupEvidenceImage } from "./cloudinary.service.js";
 
 const activeStatuses = ["ASSIGNED", "COLLECTING", "ARRIVED"];
 const terminalStatuses = ["COLLECTED", "FAILED", "CANCELLED", "REJECTED"];
@@ -116,6 +117,7 @@ export const updateOwnAssignmentStatus = async (accountId, assignmentId, payload
       throw new AppError("Actual weight is required for every scheduled waste item", 400);
     }
 
+    const evidenceImageUrl = await uploadPickupEvidenceImage(payload.evidenceImageDataUri);
     const scheduledItems = new Map(assignment.request.wasteItems.map((item) => [item.idItem, item]));
     const receivedItemIds = new Set();
 
@@ -137,12 +139,13 @@ export const updateOwnAssignmentStatus = async (accountId, assignmentId, payload
         actualWeight: item.actualWeight,
         pointsEarned: Math.round(item.actualWeight * (scheduledItem.category?.pointFactor || 0)),
       });
-      evidenceImages.push({
-        idItem: item.wasteItemId,
-        url: payload.evidenceImageDataUri,
-        type: "COLLECTION_EVIDENCE",
-      });
     }
+
+    evidenceImages.push({
+      idItem: items[0].wasteItemId,
+      url: evidenceImageUrl,
+      type: "COLLECTION_EVIDENCE",
+    });
   }
 
   await driverAssignmentRepository.updateAssignmentResult({

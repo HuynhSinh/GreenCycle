@@ -19,12 +19,12 @@ const signUploadParams = (params) => {
   return crypto.createHash("sha1").update(`${sorted}${config.cloudinary.apiSecret}`).digest("hex");
 };
 
-export const uploadRewardImage = async (imageDataUri) => {
+const uploadImage = async (imageDataUri, folder, errorMessage) => {
   ensureCloudinaryConfig();
 
   const timestamp = Math.floor(Date.now() / 1000);
   const uploadParams = {
-    folder: config.cloudinary.folder,
+    folder,
     timestamp,
   };
   const signature = signUploadParams(uploadParams);
@@ -43,8 +43,14 @@ export const uploadRewardImage = async (imageDataUri) => {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new AppError(data?.error?.message || "Could not upload reward image", 502);
+    throw new AppError(data?.error?.message || errorMessage, 502);
   }
 
   return data.secure_url;
 };
+
+export const uploadRewardImage = (imageDataUri) =>
+  uploadImage(imageDataUri, config.cloudinary.folder, "Could not upload reward image");
+
+export const uploadPickupEvidenceImage = (imageDataUri) =>
+  uploadImage(imageDataUri, `${config.cloudinary.folder}/pickup-evidence`, "Could not upload pickup evidence image");

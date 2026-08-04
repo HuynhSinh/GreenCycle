@@ -67,7 +67,7 @@ export default function CollectionScheduleManagement() {
     activeDrivers: 0,
     timeConflicts: 0,
   });
-  const [scheduleDate, setScheduleDate] = useState(getLocalDateInputValue);
+  const [scheduleDate, setScheduleDate] = useState('');
   const [panelOpen, setPanelOpen] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
@@ -86,7 +86,6 @@ export default function CollectionScheduleManagement() {
     try {
       const response = await getCollectionSchedule({
         date: scheduleDate,
-        district: 'District 5',
         status: statusFilter,
         page: currentPage,
         limit: PAGE_SIZE,
@@ -342,20 +341,33 @@ export default function CollectionScheduleManagement() {
                 <div className="flex flex-col gap-4 border-b border-slate-200 p-5 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900">Pickup Requests</h2>
-                    <p className="mt-1 text-sm text-slate-600">Filter, review, approve, reject, and assign District 5 pickups.</p>
+                    <p className="mt-1 text-sm text-slate-600">Filter, review, approve, reject, and assign pickup requests.</p>
                   </div>
                   <div className="flex flex-col gap-3 sm:flex-row">
-                    <label className="block sm:w-40">
-                      <input
-                        type="date"
-                        value={scheduleDate}
-                        onChange={(event) => {
+                    <div className="flex gap-2 sm:w-64">
+                      <label className="block min-w-0 flex-1">
+                        <input
+                          type="date"
+                          value={scheduleDate}
+                          onChange={(event) => {
+                            setCurrentPage(1);
+                            setScheduleDate(event.target.value);
+                          }}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                          aria-label="Filter by pickup date"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
                           setCurrentPage(1);
-                          setScheduleDate(event.target.value);
+                          setScheduleDate(scheduleDate ? '' : getLocalDateInputValue());
                         }}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                      />
-                    </label>
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                      >
+                        {scheduleDate ? 'All dates' : 'Today'}
+                      </button>
+                    </div>
                     <label className="relative block min-w-0 sm:w-72">
                       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <input
@@ -521,6 +533,27 @@ export default function CollectionScheduleManagement() {
                     <p className="mt-1 text-sm text-slate-700">{selectedRequest.ward}, {selectedRequest.district}</p>
                     <div className="mt-3 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700">
                       Requested time: {selectedRequest.preferredTime}
+                    </div>
+                  </div>
+                )}
+
+                {selectedRequest?.evidenceImages?.length > 0 && (
+                  <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4">
+                    <p className="mb-3 text-sm font-semibold text-slate-700">Collection evidence</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {selectedRequest.evidenceImages.map((image) => (
+                        <a
+                          key={image.id}
+                          href={image.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="group overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
+                          title={`Open ${image.category} evidence`}
+                        >
+                          <img src={image.url} alt={`${image.category} evidence`} className="h-24 w-full object-cover transition-transform group-hover:scale-105" />
+                          <div className="px-2 py-1 text-xs font-semibold text-slate-600">{image.category}</div>
+                        </a>
+                      ))}
                     </div>
                   </div>
                 )}

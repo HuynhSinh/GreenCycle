@@ -1,12 +1,14 @@
 import { prisma } from "../config/db.js";
 
 const buildScheduleRequestWhere = ({ startDate, endDate, district, status }) => {
-  const where = {
-    scheduledTime: {
+  const where = {};
+
+  if (startDate && endDate) {
+    where.scheduledTime = {
       gte: startDate,
       lt: endDate,
-    },
-  };
+    };
+  }
 
   if (district) {
     where.address = {
@@ -38,6 +40,7 @@ export const findPickupRequestsForSchedule = ({ startDate, endDate, district, st
       wasteItems: {
         include: {
           category: true,
+          images: true,
         },
       },
       assignment: {
@@ -78,10 +81,17 @@ export const findDriversForSchedule = ({ startDate, endDate }) =>
       assignments: {
         where: {
           request: {
-            scheduledTime: {
-              gte: startDate,
-              lt: endDate,
+            status: {
+              in: ["ASSIGNED", "COLLECTING", "ARRIVED"],
             },
+            ...(startDate && endDate
+              ? {
+                  scheduledTime: {
+                    gte: startDate,
+                    lt: endDate,
+                  },
+                }
+              : {}),
           },
         },
         include: {
@@ -153,7 +163,7 @@ export const sumDriverAssignedWeightForSchedule = async ({ idDriver, startDate, 
         lt: endDate,
       },
       status: {
-        in: ["ASSIGNED", "COLLECTING", "ARRIVED", "COLLECTED"],
+        in: ["ASSIGNED", "COLLECTING", "ARRIVED"],
       },
       assignment: {
         is: {
@@ -177,7 +187,7 @@ export const countDriverAssignmentsAtTime = ({ idDriver, scheduledTime, excludeR
         idRequest: excludeRequestId ? { not: excludeRequestId } : undefined,
         scheduledTime,
         status: {
-          in: ["ASSIGNED", "COLLECTING", "ARRIVED", "COLLECTED"],
+          in: ["ASSIGNED", "COLLECTING", "ARRIVED"],
         },
       },
     },

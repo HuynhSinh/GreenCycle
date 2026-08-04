@@ -1,6 +1,6 @@
 import { apiRequest } from '../../../lib/api-client';
 
-export function getCollectionSchedule({ date, district = 'District 5', status = 'ALL', page = 1, limit = 20 } = {}) {
+export function getCollectionSchedule({ date = '', district = '', status = 'ALL', page = 1, limit = 20 } = {}) {
   const params = new URLSearchParams();
 
   if (date) params.set('date', date);
