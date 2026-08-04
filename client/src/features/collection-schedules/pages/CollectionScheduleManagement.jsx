@@ -262,7 +262,7 @@ export default function CollectionScheduleManagement() {
             sidebarOpen={sidebarOpen}
             onClick={() => navigate('/dashboard/admin')}
           />
-          <NavItem icon={Users} label="Users" sidebarOpen={sidebarOpen} />
+          <NavItem icon={Users} label="Drivers" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/drivers')} />
           <NavItem icon={CalendarDays} label="Schedules" sidebarOpen={sidebarOpen} active />
           <NavItem icon={PackageCheck} label="Pickups" sidebarOpen={sidebarOpen} />
           <NavItem icon={Award} label="Rewards" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/rewards')} />

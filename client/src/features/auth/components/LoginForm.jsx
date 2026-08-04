@@ -16,12 +16,11 @@ export function LoginForm() {
     register,
     handleSubmit,
     formState: { errors },
-    watch,
   } = useForm({
     resolver: zodResolver(loginSchema),
     mode: 'onChange',
     defaultValues: {
-      email: '',
+      identifier: '',
       password: '',
       rememberMe: false,
     },
@@ -56,7 +55,7 @@ export function LoginForm() {
     } catch (error) {
       setAuthStatus({
         success: false,
-        message: error.message || 'Invalid email or password.',
+        message: error.message || 'Invalid username/email or password.',
       });
     } finally {
       setIsLoading(false);
@@ -127,26 +126,26 @@ export function LoginForm() {
 
       {/* Login Form */}
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
-        {/* Email Field */}
+        {/* Identifier Field */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="email" className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
-            Email Address
+          <label htmlFor="identifier" className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            Email or Username
           </label>
           <input
-            id="email"
+            id="identifier"
             type="text"
-            placeholder="name@company.com"
+            placeholder="name@company.com or driver01"
             disabled={isLoading}
-            {...register('email')}
+            {...register('identifier')}
             className={`w-full px-4 py-3 border rounded-xl text-[15px] outline-none transition-all placeholder:text-slate-400/80 ${
-              errors.email
+              errors.identifier
                 ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
                 : 'border-slate-200 focus:border-slate-400 focus:ring-4 focus:ring-slate-100'
             } disabled:bg-slate-50 disabled:text-slate-400`}
           />
-          {errors.email && (
+          {errors.identifier && (
             <span className="text-[13px] text-red-500 font-medium flex items-center gap-1 mt-0.5">
-              {errors.email.message}
+              {errors.identifier.message}
             </span>
           )}
         </div>

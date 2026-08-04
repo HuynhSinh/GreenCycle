@@ -50,7 +50,7 @@ export default function AdminDashboard() {
         {/* Menu Items */}
         <nav className="flex-1 p-4 space-y-2">
           <NavItem icon={BarChart3} label="Dashboard" sidebarOpen={sidebarOpen} active />
-          <NavItem icon={Users} label="Users" sidebarOpen={sidebarOpen} />
+          <NavItem icon={Users} label="Drivers" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/drivers')} />
           <NavItem icon={CalendarDays} label="Schedules" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/schedules')} />
           <NavItem icon={TrendingUp} label="Pickups" sidebarOpen={sidebarOpen} />
           <NavItem icon={Award} label="Rewards" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/rewards')} />

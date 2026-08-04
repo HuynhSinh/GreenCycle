@@ -19,8 +19,12 @@ export const registerSchema = z.object({
 
 export const loginSchema = z.object({
   body: z.object({
-    email: z.string().trim().email().max(255),
+    identifier: z.string().trim().min(1).max(255).optional(),
+    email: z.string().trim().max(255).optional(),
     password: z.string().min(1).max(128),
     rememberMe: z.boolean().optional().default(false),
+  }).refine((body) => body.identifier || body.email, {
+    message: "Email or username is required",
+    path: ["identifier"],
   }),
 });

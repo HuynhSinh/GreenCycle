@@ -31,7 +31,7 @@ export const fullNameSchema = z
 
 // Login schema
 export const loginSchema = z.object({
-  email: emailSchema,
+  identifier: z.string().min(1, 'Email or username is required').max(255).trim(),
   password: passwordSchemaLogin,
   rememberMe: z.boolean().optional(),
 });

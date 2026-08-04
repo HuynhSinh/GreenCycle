@@ -20,7 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import { logout } from '../../auth/api/auth';
 import { createAdminReward, getAdminRewards, updateAdminReward } from '../api/rewards';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 5;
 
 const emptyForm = {
   name: '',
@@ -231,7 +231,7 @@ export default function AdminRewardManagement() {
 
         <nav className="flex-1 space-y-2 p-4">
           <NavItem icon={LayoutDashboard} label="Dashboard" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin')} />
-          <NavItem icon={Users} label="Users" sidebarOpen={sidebarOpen} />
+          <NavItem icon={Users} label="Drivers" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/drivers')} />
           <NavItem icon={CalendarDays} label="Schedules" sidebarOpen={sidebarOpen} onClick={() => navigate('/dashboard/admin/schedules')} />
           <NavItem icon={PackageCheck} label="Pickups" sidebarOpen={sidebarOpen} />
           <NavItem icon={Award} label="Rewards" sidebarOpen={sidebarOpen} active />

@@ -8,7 +8,11 @@ export const validate = (schema) => (req, res, next) => {
   });
 
   if (!result.success) {
-  return next(new AppError("Invalid request payload", 400));
+    const firstIssue = result.error.issues[0];
+    const path = firstIssue?.path?.join(".");
+    const detail = [path, firstIssue?.message].filter(Boolean).join(": ");
+
+    return next(new AppError(detail || "Invalid request payload", 400));
   }
 
   req.validated = result.data;

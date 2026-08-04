@@ -7,11 +7,11 @@ const usernameFromEmail = (email) =>
     .replace(/[^a-z0-9_.-]/g, '_')
     .slice(0, 50);
 
-export function login({ email, password, rememberMe }) {
+export function login({ identifier, email, password, rememberMe }) {
   return apiRequest('/login', {
     method: 'POST',
     body: JSON.stringify({
-      email,
+      identifier: identifier || email,
       password,
       rememberMe,
     }),

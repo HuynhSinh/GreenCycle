@@ -68,9 +68,11 @@ export const register = async (payload, req) => {
 };
 
 export const login = async (payload, req) => {
-  const email = payload.email.trim().toLowerCase();
+  const identifier = (payload.identifier || payload.email || "").trim().toLowerCase();
 
-  const account = await findAccountByEmail(email);
+  const account = identifier.includes("@")
+    ? await findAccountByEmail(identifier)
+    : await findAccountByUsername(identifier);
 
   const isValidPassword = account
     ? await bcrypt.compare(payload.password, account.password)

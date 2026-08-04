@@ -7,6 +7,7 @@ import AdminDashboard from '../features/dashboard/pages/AdminDashboard';
 import CustomerDashboard from '../features/dashboard/pages/CustomerDashboard';
 import DriverDashboard from '../features/dashboard/pages/DriverDashboard';
 import CollectionScheduleManagement from '../features/collection-schedules/pages/CollectionScheduleManagement';
+import DriverManagement from '../features/drivers/pages/DriverManagement';
 import AdminRewardManagement from '../features/rewards/pages/AdminRewardManagement';
 
 export function AppRoutes() {
@@ -29,6 +30,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute requiredRole="ADMIN">
             <CollectionScheduleManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/admin/drivers"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <DriverManagement />
           </ProtectedRoute>
         }
       />
