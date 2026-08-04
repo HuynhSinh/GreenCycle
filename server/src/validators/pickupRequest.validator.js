@@ -5,6 +5,13 @@ const wasteItemSchema = z.object({
   weight: z.coerce.number().positive().max(1000),
 });
 
+const datetimeStringSchema = z
+  .string()
+  .trim()
+  .refine((value) => !Number.isNaN(Date.parse(value)), {
+    message: "scheduledTime must be a valid date string",
+  });
+
 export const createPickupRequestSchema = z.object({
   body: z.object({
     fullName: z.string().trim().min(1).max(120),
@@ -15,7 +22,7 @@ export const createPickupRequestSchema = z.object({
     city: z.string().trim().min(1).max(120).default("Ho Chi Minh"),
     latitude: z.coerce.number().finite().min(-90).max(90),
     longitude: z.coerce.number().finite().min(-180).max(180),
-    scheduledTime: z.string().datetime({ offset: true }),
+    scheduledTime: datetimeStringSchema,
     note: z.string().trim().max(500).optional().default(""),
     wasteItems: z.array(wasteItemSchema).min(1).max(20),
   }),

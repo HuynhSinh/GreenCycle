@@ -37,9 +37,6 @@ export const findAddressByCustomer = ({
         mode: "insensitive",
       },
     },
-    orderBy: {
-      createdAt: "desc",
-    },
   });
 
 export const createAddress = ({

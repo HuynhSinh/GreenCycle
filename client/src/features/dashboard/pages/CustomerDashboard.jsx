@@ -14,6 +14,17 @@ import { logout } from "../../auth/api/auth";
 import { apiRequest } from "../../../lib/api-client";
 import { useNavigate } from "react-router-dom";
 
+const validWasteCategories = [
+  "Laptop",
+  "Phone",
+  "Monitor",
+  "Printer",
+  "Tablet",
+  "Battery",
+  "Lab device",
+  "Small appliance",
+];
+
 export default function CustomerDashboard() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -34,6 +45,68 @@ export default function CustomerDashboard() {
     wasteItems: [{ categoryName: "Laptop", weight: 1.5 }],
   });
 
+  const validatePickupForm = () => {
+    const firstWasteItem = pickupForm.wasteItems?.[0] || {};
+
+    if (!pickupForm.fullName.trim()) {
+      return "Vui lòng nhập họ tên người liên hệ.";
+    }
+
+    if (!pickupForm.phoneNumber.trim()) {
+      return "Vui lòng nhập số điện thoại để tài xế liên hệ.";
+    }
+
+    if (!/^0\d{9,10}$/.test(pickupForm.phoneNumber.trim())) {
+      return "Số điện thoại phải bắt đầu bằng 0 và có 10–11 chữ số.";
+    }
+
+    if (!pickupForm.addressLine.trim()) {
+      return "Vui lòng nhập địa chỉ thu gom chi tiết.";
+    }
+
+    if (!pickupForm.district.trim()) {
+      return "Vui lòng nhập quận/huyện để hệ thống định vị.";
+    }
+
+    if (!pickupForm.city.trim()) {
+      return "Vui lòng nhập tỉnh/thành phố.";
+    }
+
+    if (!pickupForm.scheduledTime) {
+      return "Vui lòng chọn thời gian thu gom.";
+    }
+
+    const scheduledDate = new Date(pickupForm.scheduledTime);
+    if (Number.isNaN(scheduledDate.getTime())) {
+      return "Thời gian thu gom không hợp lệ.";
+    }
+
+    if (scheduledDate.getTime() < Date.now() + 30 * 60 * 1000) {
+      return "Thời gian thu gom phải sau ít nhất 30 phút từ thời điểm hiện tại.";
+    }
+
+    if (!firstWasteItem.categoryName?.trim()) {
+      return "Vui lòng chọn loại rác cần thu gom.";
+    }
+
+    if (!validWasteCategories.includes(firstWasteItem.categoryName.trim())) {
+      return "Loại rác không hợp lệ. Hãy chọn một trong: Laptop, Phone, Monitor, Printer, Tablet, Battery, Lab device, Small appliance.";
+    }
+
+    if (
+      !Number.isFinite(Number(firstWasteItem.weight)) ||
+      Number(firstWasteItem.weight) <= 0
+    ) {
+      return "Khối lượng rác phải lớn hơn 0.";
+    }
+
+    if (Number(firstWasteItem.weight) > 1000) {
+      return "Khối lượng rác tối đa là 1000 kg.";
+    }
+
+    return "";
+  };
+
   const handleLogout = async () => {
     setIsLoading(true);
     try {
@@ -51,6 +124,12 @@ export default function CustomerDashboard() {
     setFormError("");
     setFormSuccess("");
 
+    const validationMessage = validatePickupForm();
+    if (validationMessage) {
+      setFormError(validationMessage);
+      return;
+    }
+
     try {
       const result = await apiRequest("/customer/pickup-requests", {
         method: "POST",
@@ -64,6 +143,14 @@ export default function CustomerDashboard() {
         wasteItems: [{ categoryName: "Laptop", weight: 1.5 }],
       }));
     } catch (error) {
+      if (error.status === 401) {
+        setFormError(
+          "Bạn chưa đăng nhập hoặc phiên làm việc đã hết hạn. Vui lòng đăng nhập lại trước khi đặt lịch.",
+        );
+        navigate("/login");
+        return;
+      }
+
       setFormError(error.message || "Unable to create pickup request");
     }
   };
@@ -201,118 +288,187 @@ export default function CustomerDashboard() {
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
-                <input
-                  className="rounded-lg border border-slate-300 px-3 py-2"
-                  placeholder="Full name"
-                  value={pickupForm.fullName}
-                  onChange={(event) =>
-                    setPickupForm({
-                      ...pickupForm,
-                      fullName: event.target.value,
-                    })
-                  }
-                />
-                <input
-                  className="rounded-lg border border-slate-300 px-3 py-2"
-                  placeholder="Phone number"
-                  value={pickupForm.phoneNumber}
-                  onChange={(event) =>
-                    setPickupForm({
-                      ...pickupForm,
-                      phoneNumber: event.target.value,
-                    })
-                  }
-                />
-                <input
-                  className="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2"
-                  placeholder="Address line"
-                  value={pickupForm.addressLine}
-                  onChange={(event) =>
-                    setPickupForm({
-                      ...pickupForm,
-                      addressLine: event.target.value,
-                    })
-                  }
-                />
-                <input
-                  className="rounded-lg border border-slate-300 px-3 py-2"
-                  placeholder="Ward"
-                  value={pickupForm.ward}
-                  onChange={(event) =>
-                    setPickupForm({ ...pickupForm, ward: event.target.value })
-                  }
-                />
-                <input
-                  className="rounded-lg border border-slate-300 px-3 py-2"
-                  placeholder="District"
-                  value={pickupForm.district}
-                  onChange={(event) =>
-                    setPickupForm({
-                      ...pickupForm,
-                      district: event.target.value,
-                    })
-                  }
-                />
-                <input
-                  className="rounded-lg border border-slate-300 px-3 py-2"
-                  placeholder="City"
-                  value={pickupForm.city}
-                  onChange={(event) =>
-                    setPickupForm({ ...pickupForm, city: event.target.value })
-                  }
-                />
-                <input
-                  type="datetime-local"
-                  className="rounded-lg border border-slate-300 px-3 py-2"
-                  value={pickupForm.scheduledTime.slice(0, 16)}
-                  onChange={(event) =>
-                    setPickupForm({
-                      ...pickupForm,
-                      scheduledTime: new Date(event.target.value).toISOString(),
-                    })
-                  }
-                />
-                <input
-                  className="rounded-lg border border-slate-300 px-3 py-2"
-                  placeholder="Waste category"
-                  value={pickupForm.wasteItems[0].categoryName}
-                  onChange={(event) =>
-                    setPickupForm({
-                      ...pickupForm,
-                      wasteItems: [
-                        {
-                          ...pickupForm.wasteItems[0],
-                          categoryName: event.target.value,
-                        },
-                      ],
-                    })
-                  }
-                />
-                <input
-                  type="number"
-                  className="rounded-lg border border-slate-300 px-3 py-2"
-                  placeholder="Weight (kg)"
-                  value={pickupForm.wasteItems[0].weight}
-                  onChange={(event) =>
-                    setPickupForm({
-                      ...pickupForm,
-                      wasteItems: [
-                        {
-                          ...pickupForm.wasteItems[0],
-                          weight: Number(event.target.value),
-                        },
-                      ],
-                    })
-                  }
-                />
-                <textarea
-                  className="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2"
-                  placeholder="Note"
-                  value={pickupForm.note}
-                  onChange={(event) =>
-                    setPickupForm({ ...pickupForm, note: event.target.value })
-                  }
-                />
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">
+                    Họ tên người liên hệ{" "}
+                    <span className="text-rose-500">*</span>
+                  </span>
+                  <input
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    placeholder="Ví dụ: Nguyễn Văn A"
+                    value={pickupForm.fullName}
+                    onChange={(event) =>
+                      setPickupForm({
+                        ...pickupForm,
+                        fullName: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">
+                    Số điện thoại <span className="text-rose-500">*</span>
+                  </span>
+                  <input
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    placeholder="Ví dụ: 0901234567"
+                    value={pickupForm.phoneNumber}
+                    onChange={(event) =>
+                      setPickupForm({
+                        ...pickupForm,
+                        phoneNumber: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+
+                <label className="space-y-1 md:col-span-2">
+                  <span className="text-sm font-medium text-slate-700">
+                    Địa chỉ thu gom <span className="text-rose-500">*</span>
+                  </span>
+                  <input
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    placeholder="Số nhà, tên đường"
+                    value={pickupForm.addressLine}
+                    onChange={(event) =>
+                      setPickupForm({
+                        ...pickupForm,
+                        addressLine: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">
+                    Phường/Xã
+                  </span>
+                  <input
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    placeholder="Ví dụ: Phường 1"
+                    value={pickupForm.ward}
+                    onChange={(event) =>
+                      setPickupForm({ ...pickupForm, ward: event.target.value })
+                    }
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">
+                    Quận/Huyện <span className="text-rose-500">*</span>
+                  </span>
+                  <input
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    placeholder="Ví dụ: District 5"
+                    value={pickupForm.district}
+                    onChange={(event) =>
+                      setPickupForm({
+                        ...pickupForm,
+                        district: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">
+                    Tỉnh/Thành phố <span className="text-rose-500">*</span>
+                  </span>
+                  <input
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    placeholder="Ví dụ: Ho Chi Minh"
+                    value={pickupForm.city}
+                    onChange={(event) =>
+                      setPickupForm({ ...pickupForm, city: event.target.value })
+                    }
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">
+                    Thời gian thu gom <span className="text-rose-500">*</span>
+                  </span>
+                  <input
+                    type="datetime-local"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    value={pickupForm.scheduledTime.slice(0, 16)}
+                    onChange={(event) =>
+                      setPickupForm({
+                        ...pickupForm,
+                        scheduledTime: new Date(
+                          event.target.value,
+                        ).toISOString(),
+                      })
+                    }
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">
+                    Loại rác <span className="text-rose-500">*</span>
+                  </span>
+                  <select
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    value={pickupForm.wasteItems[0].categoryName}
+                    onChange={(event) =>
+                      setPickupForm({
+                        ...pickupForm,
+                        wasteItems: [
+                          {
+                            ...pickupForm.wasteItems[0],
+                            categoryName: event.target.value,
+                          },
+                        ],
+                      })
+                    }
+                  >
+                    {validWasteCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">
+                    Khối lượng (kg) <span className="text-rose-500">*</span>
+                  </span>
+                  <input
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    placeholder="Ví dụ: 1.5"
+                    value={pickupForm.wasteItems[0].weight}
+                    onChange={(event) =>
+                      setPickupForm({
+                        ...pickupForm,
+                        wasteItems: [
+                          {
+                            ...pickupForm.wasteItems[0],
+                            weight: Number(event.target.value),
+                          },
+                        ],
+                      })
+                    }
+                  />
+                </label>
+
+                <label className="space-y-1 md:col-span-2">
+                  <span className="text-sm font-medium text-slate-700">
+                    Ghi chú cho tài xế
+                  </span>
+                  <textarea
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    placeholder="Ví dụ: Thu gom vào buổi sáng, lưu ý tầng 3"
+                    value={pickupForm.note}
+                    onChange={(event) =>
+                      setPickupForm({ ...pickupForm, note: event.target.value })
+                    }
+                  />
+                </label>
               </div>
               {formError && (
                 <p className="px-6 pb-4 text-sm text-rose-600">{formError}</p>
