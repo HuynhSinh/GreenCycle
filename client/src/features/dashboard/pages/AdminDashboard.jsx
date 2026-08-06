@@ -18,6 +18,7 @@ import { getCollectionSchedule } from '../../collection-schedules/api/collection
 import { getAdminDrivers } from '../../drivers/api/drivers';
 import { getAdminRewards } from '../../rewards/api/rewards';
 import { friendlyError } from '../../../lib/messages';
+import BrandLogo from '../../../components/BrandLogo';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -134,9 +135,7 @@ export default function AdminDashboard() {
       >
         <div className="border-b border-slate-800 p-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500 font-bold">
-              GC
-            </div>
+            <BrandLogo className="h-10 w-10 rounded-lg bg-white p-1" />
             {sidebarOpen && <span className="text-lg font-bold">Admin</span>}
           </div>
         </div>

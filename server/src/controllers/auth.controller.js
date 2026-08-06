@@ -20,6 +20,17 @@ export const login = asyncHandler(async (req, res) => {
   });
 });
 
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const result = await authService.requestPasswordReset(req.validated.body);
+  res.json(result);
+});
+
+export const resetPassword = asyncHandler(async (req, res) => {
+  const result = await authService.resetPassword(req.validated.body);
+  clearAuthCookies(res);
+  res.json(result);
+});
+
 export const logout = asyncHandler(async (req, res) => {
   await authService.logout(req.cookies?.[REFRESH_COOKIE_NAME]);
   clearAuthCookies(res);

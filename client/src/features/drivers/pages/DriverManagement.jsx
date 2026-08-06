@@ -26,6 +26,7 @@ import {
 } from '../api/drivers';
 import { friendlyError, successText } from '../../../lib/messages';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
+import BrandLogo from '../../../components/BrandLogo';
 
 const PAGE_SIZE = 5;
 
@@ -254,9 +255,7 @@ export default function DriverManagement() {
       >
         <div className="border-b border-slate-800 p-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500 font-bold">
-              GC
-            </div>
+            <BrandLogo className="h-10 w-10 rounded-lg bg-white p-1" />
             {sidebarOpen && <span className="text-lg font-bold">Admin</span>}
           </div>
         </div>

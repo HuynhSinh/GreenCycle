@@ -20,6 +20,7 @@ import { logout } from '../../auth/api/auth';
 import { getDriverAssignments, updateDriverAssignmentStatus } from '../../driver-assignments/api/driverAssignments';
 import { getDriverProfile, updateDriverProfile } from '../../drivers/api/drivers';
 import { friendlyError } from '../../../lib/messages';
+import BrandLogo from '../../../components/BrandLogo';
 
 const emptyProfile = {
   fullName: '',
@@ -299,9 +300,7 @@ export default function DriverDashboard() {
       >
         <div className="border-b border-slate-800 p-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500 font-bold">
-              GC
-            </div>
+            <BrandLogo className="h-10 w-10 rounded-lg bg-white p-1" />
             {sidebarOpen && <span className="text-lg font-bold">Driver</span>}
           </div>
         </div>

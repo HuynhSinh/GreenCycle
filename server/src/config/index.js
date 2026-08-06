@@ -70,6 +70,19 @@ export const config = {
     authWindowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
     authMax: Number(process.env.AUTH_RATE_LIMIT_MAX || 10),
   },
+  passwordReset: {
+    otpExpiresMinutes: Number(process.env.PASSWORD_RESET_OTP_EXPIRES_MINUTES || 5),
+  },
+  email: {
+    smtpHost: process.env.EMAIL_SMTP_HOST,
+    smtpPort: Number(process.env.EMAIL_SMTP_PORT || 587),
+    smtpSecure: process.env.EMAIL_SMTP_SECURE === "true",
+    tlsRejectUnauthorized: process.env.EMAIL_TLS_REJECT_UNAUTHORIZED !== "false",
+    smtpUser: process.env.EMAIL_SMTP_USER,
+    smtpPass: process.env.EMAIL_SMTP_PASS,
+    fromName: process.env.EMAIL_FROM_NAME || "GreenCycle",
+    fromAddress: process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_SMTP_USER,
+  },
   cloudinary: {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME,
     apiKey: process.env.CLOUDINARY_API_KEY,

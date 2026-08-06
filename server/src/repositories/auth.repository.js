@@ -15,6 +15,12 @@ export const findAccountByEmail = (email) =>
     where: { email },
   });
 
+export const updateAccountPassword = (idAccount, password) =>
+  prisma.account.update({
+    where: { idAccount },
+    data: { password },
+  });
+
 export const createAccount = (data) =>
   prisma.account.create({
     data,
@@ -63,15 +69,54 @@ export const createRefreshToken = (data) =>
     data,
   });
 
+export const findRefreshTokenByHash = (tokenHash) =>
+  prisma.refreshToken.findUnique({
+    where: { tokenHash },
+  });
+
 export const deleteRefreshTokenByHash = (tokenHash) =>
   prisma.refreshToken.deleteMany({
     where: { tokenHash },
+  });
+
+export const deleteRefreshTokensForAccount = (idAccount) =>
+  prisma.refreshToken.deleteMany({
+    where: { idAccount },
   });
 
 export const deleteExpiredRefreshTokensForAccount = (idAccount) =>
   prisma.refreshToken.deleteMany({
     where: {
       idAccount,
+      expiresAt: {
+        lt: new Date(),
+      },
+    },
+  });
+
+export const createPasswordResetToken = (data) =>
+  prisma.passwordResetToken.create({
+    data,
+  });
+
+export const findPasswordResetTokenByHash = (tokenHash) =>
+  prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+  });
+
+export const deletePasswordResetTokenByHash = (tokenHash) =>
+  prisma.passwordResetToken.deleteMany({
+    where: { tokenHash },
+  });
+
+export const deletePasswordResetTokensForAccount = (idAccount) =>
+  prisma.passwordResetToken.deleteMany({
+    where: { idAccount },
+  });
+
+export const deleteExpiredPasswordResetTokens = () =>
+  prisma.passwordResetToken.deleteMany({
+    where: {
       expiresAt: {
         lt: new Date(),
       },

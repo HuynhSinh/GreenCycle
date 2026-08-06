@@ -6,6 +6,7 @@ import { Eye, EyeOff, ArrowRight, ShieldCheck, CheckCircle2, AlertCircle } from 
 import { register as registerAccount } from '../api/auth';
 import { signupSchema, calculatePasswordStrength } from '../../../lib/validators';
 import { friendlyError } from '../../../lib/messages';
+import BrandLogo from '../../../components/BrandLogo';
 
 export function SignUpForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -61,24 +62,7 @@ export function SignUpForm() {
       <div className="p-8">
         {/* Brand Header */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center border border-emerald-100/80 mb-3 shadow-sm">
-            {/* GreenCycle Leaf Icon */}
-            <svg
-              className="w-6 h-6 text-emerald-600"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 2C6.5 2 2 6.5 2 12c0 5.5 4.5 10 10 10 0-4 2-7 5-9 3-2 3-5 3-5s-3 0-5 3c-2 3-5 5-9 5 0-5.5 4.5-10 10-10z"
-                className="fill-emerald-500/10 stroke-[1.75]"
-              />
-            </svg>
-          </div>
+          <BrandLogo className="h-32 w-full max-w-[280px] mb-2" />
           <h1 className="text-[28px] font-bold text-slate-900 tracking-tight leading-none mb-1">
             Create Account
           </h1>

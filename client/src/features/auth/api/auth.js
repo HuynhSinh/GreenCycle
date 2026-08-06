@@ -38,3 +38,17 @@ export function logout() {
 export function getMe() {
   return apiRequest('/me');
 }
+
+export function forgotPassword({ email }) {
+  return apiRequest('/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPassword({ email, otp, password }) {
+  return apiRequest('/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ email, otp, password }),
+  });
+}

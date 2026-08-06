@@ -2,6 +2,8 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from '../pages/Login';
 import SignUpPage from '../pages/SignUp';
+import ForgotPasswordPage from '../pages/ForgotPassword';
+import ResetPasswordPage from '../pages/ResetPassword';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import AdminDashboard from '../features/dashboard/pages/AdminDashboard';
 import CustomerDashboard from '../features/dashboard/pages/CustomerDashboard';
@@ -15,6 +17,8 @@ export function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {/* Protected Dashboard Routes */}
       <Route

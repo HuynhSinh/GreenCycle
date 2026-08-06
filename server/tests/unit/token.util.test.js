@@ -27,7 +27,7 @@ describe("token utilities", () => {
     expect(payload.role).toBe("CUSTOMER");
   });
 
-  it("extends token lifetime when remember me is enabled", () => {
+  it("keeps access tokens short and extends refresh lifetime when remember me is enabled", () => {
     const account = {
       idAccount: "account-1",
       role: "CUSTOMER",
@@ -43,13 +43,13 @@ describe("token utilities", () => {
     const defaultRefreshPayload = verifyRefreshToken(defaultRefreshToken);
     const rememberMeRefreshPayload = verifyRefreshToken(rememberMeRefreshToken);
 
-    expect(rememberMeAccessPayload.exp - rememberMeAccessPayload.iat).toBeGreaterThan(
+    expect(rememberMeAccessPayload.exp - rememberMeAccessPayload.iat).toBe(
       defaultAccessPayload.exp - defaultAccessPayload.iat,
     );
     expect(rememberMeRefreshPayload.exp - rememberMeRefreshPayload.iat).toBeGreaterThan(
       defaultRefreshPayload.exp - defaultRefreshPayload.iat,
     );
-    expect(getAccessCookieOptions(true).maxAge).toBeGreaterThan(getAccessCookieOptions(false).maxAge);
+    expect(getAccessCookieOptions(true).maxAge).toBe(getAccessCookieOptions(false).maxAge);
     expect(getRefreshCookieOptions(true).maxAge).toBeGreaterThan(getRefreshCookieOptions(false).maxAge);
   });
 });

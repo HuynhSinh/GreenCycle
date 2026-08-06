@@ -36,6 +36,25 @@ export const loginSchema = z.object({
   rememberMe: z.boolean().optional(),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+
+export const resetPasswordSchema = z
+  .object({
+    email: emailSchema,
+    otp: z
+      .string()
+      .min(1, 'OTP is required')
+      .regex(/^\d{6}$/, 'OTP must be a 6-digit code'),
+    password: passwordSchema,
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
+
 // Sign up schema
 export const signupSchema = z
   .object({

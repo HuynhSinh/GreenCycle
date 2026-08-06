@@ -6,6 +6,7 @@ import { Eye, EyeOff, LogIn, ShieldCheck, CheckCircle2, AlertCircle } from 'luci
 import { login } from '../api/auth';
 import { loginSchema } from '../../../lib/validators';
 import { friendlyError } from '../../../lib/messages';
+import BrandLogo from '../../../components/BrandLogo';
 
 export function LoginForm() {
   const navigate = useNavigate();
@@ -64,41 +65,7 @@ export function LoginForm() {
     <div className="w-full max-w-[420px] bg-white rounded-2xl p-8 shadow-[0_20px_50px_rgba(15,23,42,0.08)] border border-slate-100/50">
       {/* Brand Header */}
       <div className="flex flex-col items-center mb-8">
-        <div className="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center border border-emerald-100/80 mb-3 shadow-sm">
-          {/* Custom GreenCycle Leaf Icon */}
-          <svg
-            className="w-6 h-6 text-emerald-600"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m11.314 11.314l.707.707M12 5a7 7 0 100 14 7 7 0 000-14z"
-              style={{ display: 'none' }} // Placeholder if we want the actual leaf
-            />
-            {/* Beautiful Leaf path */}
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 21c-4.97 0-9-4.03-9-9 0-4.97 4.03-9 9-9 4.97 0 9 4.03 9 9v1c0 2.21-1.79 4-4 4h-2c-1.1 0-2 .9-2 2v2zm0-18c-3.87 0-7 3.13-7 7s3.13 7 7 7c2.21 0 4-1.79 4-4V11c0-2.21-1.79-4-4-4h-2"
-              style={{ display: 'none' }}
-            />
-            {/* True clean modern leaf path */}
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 2C6.5 2 2 6.5 2 12c0 5.5 4.5 10 10 10 0-4 2-7 5-9 3-2 3-5 3-5s-3 0-5 3c-2 3-5 5-9 5 0-5.5 4.5-10 10-10z"
-              className="fill-emerald-500/10 stroke-[1.75]"
-            />
-          </svg>
-        </div>
-        <h1 className="text-[28px] font-bold text-slate-900 tracking-tight leading-none mb-1">
-          GreenCycle
-        </h1>
+        <BrandLogo className="h-32 w-full max-w-[280px] mb-2" />
         <p className="text-[14px] text-slate-500 font-medium">
           Sign in to the GreenCycle Portal
         </p>
@@ -154,13 +121,12 @@ export function LoginForm() {
             <label htmlFor="password" className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
               Password <span className="text-rose-600">*</span>
             </label>
-            <a
-              href="#forgot"
+            <Link
+              to="/forgot-password"
               className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
-              onClick={(e) => e.preventDefault()}
             >
               Forgot password?
-            </a>
+            </Link>
           </div>
           <div className="relative">
             <input

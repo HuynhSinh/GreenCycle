@@ -6,8 +6,6 @@ export const ACCESS_COOKIE_NAME = "accessToken";
 export const REFRESH_COOKIE_NAME = "refreshToken";
 
 export const signAccessToken = (account, options = {}) => {
-  const rememberMe = Boolean(options.rememberMe);
-
   return jwt.sign({ sub: account.idAccount, role: account.role }, config.jwt.accessSecret, {
     expiresIn: config.jwt.accessExpiresIn,
   });
@@ -27,7 +25,7 @@ export const verifyRefreshToken = (token) => jwt.verify(token, config.jwt.refres
 
 export const hashToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
 
-export const getAccessCookieOptions = (rememberMe = false) => ({
+export const getAccessCookieOptions = () => ({
   httpOnly: true,
   secure: config.cookies.secure,
   sameSite: config.cookies.sameSite,
@@ -53,8 +51,12 @@ export const getClearCookieOptions = () => ({
 export const setAuthCookies = (res, tokens, options = {}) => {
   const rememberMe = Boolean(options.rememberMe);
 
-  res.cookie(ACCESS_COOKIE_NAME, tokens.accessToken, getAccessCookieOptions(rememberMe));
+  res.cookie(ACCESS_COOKIE_NAME, tokens.accessToken, getAccessCookieOptions());
   res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, getRefreshCookieOptions(rememberMe));
+};
+
+export const setAccessCookie = (res, accessToken) => {
+  res.cookie(ACCESS_COOKIE_NAME, accessToken, getAccessCookieOptions());
 };
 
 export const clearAuthCookies = (res) => {

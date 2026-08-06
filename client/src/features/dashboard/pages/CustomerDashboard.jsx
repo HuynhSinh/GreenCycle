@@ -31,6 +31,7 @@ import {
 } from '../../rewards/api/customerRewards';
 import { friendlyError, successText } from '../../../lib/messages';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
+import BrandLogo from '../../../components/BrandLogo';
 
 const initialForm = {
   fullName: '',
@@ -421,7 +422,7 @@ export default function CustomerDashboard() {
       <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} fixed inset-y-0 left-0 z-20 flex flex-col bg-emerald-700 text-white transition-all duration-300 lg:static`}>
         <div className="border-b border-emerald-600 p-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white font-bold text-emerald-700">GC</div>
+            <BrandLogo className="h-10 w-10 rounded-lg bg-white p-1" />
             {sidebarOpen && <span className="text-lg font-bold">Customer</span>}
           </div>
         </div>
