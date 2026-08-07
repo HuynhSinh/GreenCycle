@@ -18,10 +18,10 @@ const toDayRangeFromDate = (date) => {
   return { startDate, endDate };
 };
 
-const formatTime = (date) =>
-  new Intl.DateTimeFormat("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
+const formatDateTime = (date) =>
+  new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
     hour12: false,
     timeZone: "Asia/Ho_Chi_Minh",
   }).format(date);
@@ -54,8 +54,8 @@ const mapRequest = (request) => {
     address: request.address?.addressLine || "Unknown address",
     ward: request.address?.ward || "Unspecified ward",
     district: request.address?.district || "Unspecified district",
-    preferredTime: request.note?.match(/preferred:\s*([^;]+)/i)?.[1] || formatTime(request.scheduledTime),
-    scheduledTime: formatTime(request.scheduledTime),
+    preferredTime: formatDateTime(request.scheduledTime),
+    scheduledTime: formatDateTime(request.scheduledTime),
     status: request.status,
     weight: formatWeight(request.totalWeight || request.wasteItems.reduce((total, item) => total + item.weight, 0)),
     items: request.wasteItems.map((item) => item.category?.name).filter(Boolean).join(", ") || "E-waste items",

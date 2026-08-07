@@ -424,7 +424,7 @@ export default function CollectionScheduleManagement() {
                       <tr>
                         <TableHead>Request</TableHead>
                         <TableHead>Location</TableHead>
-                        <TableHead>Preferred Window</TableHead>
+                        <TableHead>Requested Time</TableHead>
                         <TableHead>Driver</TableHead>
                         <TableHead>Status</TableHead>
                       </tr>
