@@ -26,6 +26,14 @@ const formatDateTime = (date) =>
     timeZone: "Asia/Ho_Chi_Minh",
   }).format(date);
 
+const formatDateKey = (date) =>
+  new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Ho_Chi_Minh",
+  }).format(date);
+
 const formatWeight = (weight) => {
   const rounded = Number(weight || 0).toFixed(1).replace(/\.0$/, "");
   return `${rounded} kg`;
@@ -56,7 +64,9 @@ const mapRequest = (request) => {
     district: request.address?.district || "Unspecified district",
     preferredTime: formatDateTime(request.scheduledTime),
     scheduledTime: formatDateTime(request.scheduledTime),
+    scheduledDate: formatDateKey(request.scheduledTime),
     status: request.status,
+    totalWeightKg: Number(request.totalWeight || request.wasteItems.reduce((total, item) => total + item.weight, 0)),
     weight: formatWeight(request.totalWeight || request.wasteItems.reduce((total, item) => total + item.weight, 0)),
     items: request.wasteItems.map((item) => item.category?.name).filter(Boolean).join(", ") || "E-waste items",
     evidenceImages: [...evidenceImagesByUrl.values()],
@@ -70,6 +80,22 @@ const mapDriver = (driver, hasDateFilter) => {
     (total, assignment) => total + (assignment.request?.totalWeight || 0),
     0,
   );
+  const dailyWeightByDate = new Map();
+
+  for (const assignment of driver.assignments) {
+    if (!assignment.request?.scheduledTime) continue;
+
+    const dateKey = formatDateKey(assignment.request.scheduledTime);
+    dailyWeightByDate.set(dateKey, (dailyWeightByDate.get(dateKey) || 0) + (assignment.request.totalWeight || 0));
+  }
+
+  const dailyLoads = [...dailyWeightByDate.entries()].map(([date, dailyAssignedWeight]) => ({
+    date,
+    assignedWeightKg: dailyAssignedWeight,
+    assignedWeight: formatWeight(dailyAssignedWeight),
+    remainingCapacityKg: Math.max(0, Number(driver.maxCapacityKg || 0) - dailyAssignedWeight),
+    remainingCapacity: formatWeight(Math.max(0, Number(driver.maxCapacityKg || 0) - dailyAssignedWeight)),
+  }));
 
   return {
     id: driver.idDriver,
@@ -77,7 +103,10 @@ const mapDriver = (driver, hasDateFilter) => {
     vehicle: [driver.vehicleInfo, driver.licensePlate].filter(Boolean).join(" - ") || "Vehicle not set",
     active: driver.isActive,
     maxCapacityKg: driver.maxCapacityKg,
+    assignedWeightKg: assignedWeight,
+    remainingCapacityKg: Math.max(0, Number(driver.maxCapacityKg || 0) - assignedWeight),
     load: formatWeight(assignedWeight),
+    dailyLoads,
     window: driver.isActive
       ? `${hasDateFilter ? "Available on selected date" : "Active"} (${formatWeight(driver.maxCapacityKg)} max)`
       : "Inactive",

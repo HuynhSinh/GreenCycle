@@ -159,6 +159,7 @@ export default function CollectionScheduleManagement() {
 
   const selectedRequest = pickupRequests.find((request) => request.id === selectedRequestId);
   const selectedDriver = drivers.find((driver) => driver.id === selectedDriverId);
+  const selectedDriverDailyLoad = getDriverDailyLoad(selectedDriver, selectedRequest);
 
   const handleLogout = async () => {
     setIsLoading(true);
@@ -242,7 +243,11 @@ export default function CollectionScheduleManagement() {
 
   const canApprove = selectedRequest && selectedRequest.status === 'PENDING';
   const canReject = selectedRequest && ['PENDING', 'APPROVED'].includes(selectedRequest.status);
-  const canAssign = selectedRequest && selectedDriver?.active && selectedRequest.status === 'APPROVED';
+  const canAssign =
+    selectedRequest &&
+    selectedDriver?.active &&
+    selectedRequest.status === 'APPROVED' &&
+    selectedDriverDailyLoad.remainingCapacityKg >= Number(selectedRequest.totalWeightKg || 0);
   const showAssignmentControls = selectedRequest?.status === 'APPROVED';
 
   return (
@@ -582,31 +587,46 @@ export default function CollectionScheduleManagement() {
                 <div className="mt-6">
                   <p className="mb-3 text-sm font-semibold text-slate-700">Available drivers</p>
                   <div className="space-y-3">
-                    {drivers.map((driver) => (
-                      <button
-                        key={driver.id}
-                        onClick={() => setSelectedDriverId(driver.id)}
-                        disabled={!driver.active}
-                        className={`w-full rounded-lg border p-3 text-left transition ${
-                          selectedDriverId === driver.id
-                            ? 'border-emerald-500 bg-emerald-50'
-                            : 'border-slate-200 hover:bg-slate-50'
-                        } disabled:cursor-not-allowed disabled:opacity-50`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-semibold text-slate-950">{driver.name}</p>
-                            <p className="mt-1 text-xs text-slate-500">{driver.vehicle}</p>
-                            <p className="mt-1 text-xs text-slate-500">{driver.window} - {driver.load}</p>
+                    {drivers.map((driver) => {
+                      const dailyLoad = getDriverDailyLoad(driver, selectedRequest);
+                      const requestWeight = Number(selectedRequest?.totalWeightKg || 0);
+                      const hasCapacity = dailyLoad.remainingCapacityKg >= requestWeight;
+                      const disabled = !driver.active || !hasCapacity;
+
+                      return (
+                        <button
+                          key={driver.id}
+                          onClick={() => setSelectedDriverId(driver.id)}
+                          disabled={disabled}
+                          className={`w-full rounded-lg border p-3 text-left transition ${
+                            selectedDriverId === driver.id
+                              ? 'border-emerald-500 bg-emerald-50'
+                              : 'border-slate-200 hover:bg-slate-50'
+                          } disabled:cursor-not-allowed disabled:opacity-50`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-slate-950">{driver.name}</p>
+                              <p className="mt-1 text-xs text-slate-500">{driver.vehicle}</p>
+                              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                <DriverLoadStat label="Received today" value={dailyLoad.assignedWeight} />
+                                <DriverLoadStat label="Can take more" value={dailyLoad.remainingCapacity} />
+                              </div>
+                              {!hasCapacity && (
+                                <p className="mt-2 text-xs font-semibold text-rose-700">
+                                  Not enough capacity for this {selectedRequest.weight} request.
+                                </p>
+                              )}
+                            </div>
+                            {disabled ? (
+                              <AlertTriangle className="h-5 w-5 text-amber-500" />
+                            ) : (
+                              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                            )}
                           </div>
-                          {driver.conflict ? (
-                            <AlertTriangle className="h-5 w-5 text-amber-500" />
-                          ) : (
-                            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                          )}
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      );
+                    })}
                     {drivers.length === 0 && (
                       <div className="rounded-lg border border-slate-200 p-4 text-sm font-medium text-slate-500">
                         No available drivers for the selected date.
@@ -699,6 +719,46 @@ export default function CollectionScheduleManagement() {
 
 function TableHead({ children }) {
   return <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-600">{children}</th>;
+}
+
+function getDriverDailyLoad(driver, request) {
+  if (!driver || !request) {
+    return {
+      assignedWeightKg: 0,
+      assignedWeight: '0 kg',
+      remainingCapacityKg: 0,
+      remainingCapacity: '0 kg',
+    };
+  }
+
+  const dailyLoad = driver.dailyLoads?.find((load) => load.date === request.scheduledDate);
+
+  if (dailyLoad) {
+    return dailyLoad;
+  }
+
+  const maxCapacityKg = Number(driver.maxCapacityKg || 0);
+
+  return {
+    assignedWeightKg: 0,
+    assignedWeight: '0 kg',
+    remainingCapacityKg: maxCapacityKg,
+    remainingCapacity: formatWeight(maxCapacityKg),
+  };
+}
+
+function formatWeight(weight) {
+  const rounded = Number(weight || 0).toFixed(1).replace(/\.0$/, '');
+  return `${rounded} kg`;
+}
+
+function DriverLoadStat({ label, value }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-2 py-2">
+      <p className="font-medium text-slate-500">{label}</p>
+      <p className="mt-1 font-bold text-slate-900">{value}</p>
+    </div>
+  );
 }
 
 function formatPickupStatus(status) {
